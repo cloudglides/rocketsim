@@ -2,43 +2,54 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { setupScene, setupCamera, setupRenderer, setupControls, setupLighting, setupGround, loadRocket } from "./sceneSetup";
+import { createFlames, createSmokes, animateParticles } from "./particles";
+import { createDiamonds, animateDiamonds } from "./diamonds";
+import { calculateAcceleration, updatePhysics, calculateThrust } from "./physics";
+import { setupPointerControls, setupResizeListener, handlePOVDrag, type POVControlState } from "./controls";
+import { GROUND_LEVEL, PHYSICS, CAMERA, PARTICLES } from "./constants";
 
 export default function LiftoffPage() {
-  const mountRef = useRef<HTMLDivElement>(null);
+  const mountRef = useRef<HTMLDivElement | null>(null);
   const rocketRef = useRef<THREE.Group | null>(null);
-  const particlesRef = useRef<THREE.Points | null>(null);
+  const flameRef = useRef<THREE.Points | null>(null);
+  const smokeRef = useRef<THREE.Points | null>(null);
+  const diamondsRef = useRef<THREE.Mesh[]>([]);
   const sceneInitialized = useRef(false);
 
+  // Physics refs
   const velocityRef = useRef(0);
-  const fuelRef = useRef(100);
+  const fuelRef = useRef(PHYSICS.INITIAL_FUEL);
   const thrustActiveRef = useRef(false);
-  const thrustPowerRef = useRef(0.008);
-  const gravityRef = useRef(0.0025);
-  const massRef = useRef(1000);
-  const dragCoefficientRef = useRef(0.0001);
-  const particleScaleRef = useRef(0.5);
-  const fuelConsumptionRef = useRef(0.5);
+  const thrustPowerRef = useRef(PHYSICS.THRUST_POWER);
+  const gravityRef = useRef(PHYSICS.GRAVITY);
+  const massRef = useRef(PHYSICS.MASS);
+  const dragCoefficientRef = useRef(PHYSICS.DRAG_COEFFICIENT);
+  const particleScaleRef = useRef(PARTICLES.PARTICLE_SCALE);
+  const fuelConsumptionRef = useRef(PHYSICS.FUEL_CONSUMPTION);
+  const povOffsetRef = useRef(CAMERA.DEFAULT_POV_OFFSET);
 
+  // UI State
   const [thrustActive, setThrustActive] = useState(false);
   const [followRocket, setFollowRocket] = useState(true);
   const [altitude, setAltitude] = useState(0);
   const [speed, setSpeed] = useState(0);
-  const [fuelPercent, setFuelPercent] = useState(100);
+  const [fuelPercent, setFuelPercent] = useState(PHYSICS.INITIAL_FUEL);
 
-  const [thrustPower, setThrustPower] = useState(0.008);
-  const [gravity, setGravity] = useState(0.0025);
-  const [mass, setMass] = useState(1000);
-  const [dragCoefficient, setDragCoefficient] = useState(0.0001);
-  const [particleScale, setParticleScale] = useState(0.5);
-  const [fuelConsumption, setFuelConsumption] = useState(0.5);
-  const [povOffsetY, setPovOffsetY] = useState(4);
+  // Physics params
+  const [thrustPower, setThrustPower] = useState(PHYSICS.THRUST_POWER);
+  const [gravity, setGravity] = useState(PHYSICS.GRAVITY);
+  const [mass, setMass] = useState(PHYSICS.MASS);
+  const [dragCoefficient, setDragCoefficient] = useState(PHYSICS.DRAG_COEFFICIENT);
+  const [particleScale, setParticleScale] = useState(PARTICLES.PARTICLE_SCALE);
+  const [fuelConsumption, setFuelConsumption] = useState(PHYSICS.FUEL_CONSUMPTION);
+  const [povOffsetY, setPovOffsetY] = useState(CAMERA.DEFAULT_POV_OFFSET);
+  const [showControls, setShowControls] = useState(false);
 
-  const GROUND_LEVEL = -5.5;
-  const CAMERA_OFFSET_X = 0;
-  const CAMERA_OFFSET_Z = 12;
+  // Pointer control state
+  const povControlStateRef = useRef<POVControlState>({ isDragging: false, lastPointerY: 0 });
 
+  // Sync refs with state
   useEffect(() => { thrustActiveRef.current = thrustActive; }, [thrustActive]);
   useEffect(() => { thrustPowerRef.current = thrustPower; }, [thrustPower]);
   useEffect(() => { gravityRef.current = gravity; }, [gravity]);
@@ -46,122 +57,40 @@ export default function LiftoffPage() {
   useEffect(() => { dragCoefficientRef.current = dragCoefficient; }, [dragCoefficient]);
   useEffect(() => { particleScaleRef.current = particleScale; }, [particleScale]);
   useEffect(() => { fuelConsumptionRef.current = fuelConsumption; }, [fuelConsumption]);
-
-  useEffect(() => {
-    if (particlesRef.current) {
-      particlesRef.current.visible = thrustActive && fuelPercent > 0;
-    }
-  }, [thrustActive, fuelPercent]);
+  useEffect(() => { povOffsetRef.current = povOffsetY; }, [povOffsetY]);
 
   useEffect(() => {
     if (!mountRef.current || sceneInitialized.current) return;
     sceneInitialized.current = true;
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87ceeb);
-    scene.fog = new THREE.Fog(0x87ceeb, 50, 200);
+    // Scene setup
+    const scene = setupScene();
+    const camera = setupCamera(window.innerWidth, window.innerHeight, povOffsetRef.current);
+    const renderer = setupRenderer(mountRef.current);
+    const controls = setupControls(camera, renderer);
+    const baseLight = setupLighting(scene);
+    setupGround(scene);
 
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.set(CAMERA_OFFSET_X, GROUND_LEVEL + povOffsetY, CAMERA_OFFSET_Z);
+    // Particles
+    const flames = createFlames();
+    const smokes = createSmokes();
+    flameRef.current = flames;
+    smokeRef.current = smokes;
+    scene.add(flames);
+    scene.add(smokes);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    mountRef.current.appendChild(renderer.domElement);
+    // Diamonds
+    const diamonds = createDiamonds(scene);
+    diamondsRef.current = diamonds;
 
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    dirLight.position.set(5, 10, 5);
-    scene.add(dirLight);
-
-    const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(200, 200),
-      new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 0.8 })
-    );
-    ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -10;
-    scene.add(ground);
-
-    const particleCount = 800;
-    const positions = new Float32Array(particleCount * 3);
-    const velocities = new Float32Array(particleCount * 3);
-    const lifetimes = new Float32Array(particleCount);
-
-    for (let i = 0; i < particleCount; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 0.4;
-      positions[i * 3 + 1] = -10;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 0.4;
-      velocities[i * 3] = (Math.random() - 0.5) * 0.2;
-      velocities[i * 3 + 1] = -Math.random() * 0.3 - 0.15;
-      velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.2;
-      lifetimes[i] = Math.random();
-    }
-
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    geo.setAttribute("velocity", new THREE.BufferAttribute(velocities, 3));
-    geo.setAttribute("lifetime", new THREE.BufferAttribute(lifetimes, 1));
-
-    const mat = new THREE.PointsMaterial({
-      color: 0xff6600,
-      size: 0.5,
-      transparent: true,
-      opacity: 0.85,
-      blending: THREE.AdditiveBlending,
-    });
-
-    const particles = new THREE.Points(geo, mat);
-    particles.visible = false;
-    particlesRef.current = particles;
-    scene.add(particles);
-
-    const loader = new GLTFLoader();
-    loader.load("/model/rocket.glb", (gltf) => {
-      const rocket = gltf.scene;
+    // Load rocket model
+    loadRocket(scene, GROUND_LEVEL).then((rocket) => {
       rocketRef.current = rocket;
-      rocket.scale.set(1, 1, 1);
-      rocket.position.y = GROUND_LEVEL;
-      rocket.position.x = 0;
-      rocket.position.z = 0;
-      scene.add(rocket);
     });
 
+    // Animation loop
     const clock = new THREE.Clock();
     let animId: number;
-
-    const animateParticles = (delta: number) => {
-      if (!particlesRef.current || !thrustActiveRef.current || fuelRef.current <= 0) return;
-      const pos = particlesRef.current.geometry.attributes.position.array as Float32Array;
-      const vel = particlesRef.current.geometry.attributes.velocity.array as Float32Array;
-      const life = particlesRef.current.geometry.attributes.lifetime.array as Float32Array;
-      const intensity = Math.min(Math.abs(velocityRef.current) * 2 + 0.5, 2.5);
-      const ry = rocketRef.current?.position.y || 0;
-      const rx = rocketRef.current?.position.x || 0;
-      const rz = rocketRef.current?.position.z || 0;
-      for (let i = 0; i < particleCount; i++) {
-        life[i] += delta;
-        pos[i * 3] += vel[i * 3] * intensity;
-        pos[i * 3 + 1] += vel[i * 3 + 1] * intensity;
-        pos[i * 3 + 2] += vel[i * 3 + 2] * intensity;
-        vel[i * 3] *= 0.98;
-        vel[i * 3 + 2] *= 0.98;
-        if (pos[i * 3 + 1] < ry - 12 || life[i] > 1) {
-          pos[i * 3] = rx + (Math.random() - 0.5) * 0.6;
-          pos[i * 3 + 1] = ry - 9;
-          pos[i * 3 + 2] = rz + (Math.random() - 0.5) * 0.6;
-          vel[i * 3] = (Math.random() - 0.5) * 0.25;
-          vel[i * 3 + 1] = -Math.random() * 0.45 - 0.15;
-          vel[i * 3 + 2] = (Math.random() - 0.5) * 0.25;
-          life[i] = 0;
-        }
-      }
-      particlesRef.current.geometry.attributes.position.needsUpdate = true;
-      particlesRef.current.geometry.attributes.lifetime.needsUpdate = true;
-      (particlesRef.current.material as THREE.PointsMaterial).size = particleScaleRef.current;
-    };
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
@@ -169,57 +98,101 @@ export default function LiftoffPage() {
 
       if (rocketRef.current) {
         const rocket = rocketRef.current;
-        let thrust = 0;
-        if (thrustActiveRef.current && fuelRef.current > 0) {
-          thrust = thrustPowerRef.current;
-          fuelRef.current = Math.max(0, fuelRef.current - fuelConsumptionRef.current * delta * 2);
-          setFuelPercent(Math.round(fuelRef.current * 10) / 10);
-        }
 
-        const curMass = massRef.current + fuelRef.current * 5;
-        const accel = (thrust - gravityRef.current - dragCoefficientRef.current * velocityRef.current * Math.abs(velocityRef.current)) / (curMass / 1000);
-        velocityRef.current += accel * delta * 60;
-        rocket.position.y += velocityRef.current * delta * 60;
+        // Calculate physics
+        const thrust = calculateThrust(thrustActiveRef.current, thrustPowerRef.current, fuelRef.current);
+        const acceleration = calculateAcceleration({
+          thrust,
+          gravity: gravityRef.current,
+          dragCoefficient: dragCoefficientRef.current,
+          mass: massRef.current,
+          fuel: fuelRef.current,
+          velocity: velocityRef.current,
+        });
 
-        if (rocket.position.y <= GROUND_LEVEL && velocityRef.current < 0) {
-          rocket.position.y = GROUND_LEVEL;
-          velocityRef.current = 0;
-        }
+        const physicsUpdate = updatePhysics(
+          velocityRef.current,
+          acceleration,
+          rocket.position.y,
+          delta,
+          fuelConsumptionRef.current,
+          thrustActiveRef.current,
+          fuelRef.current
+        );
 
+        velocityRef.current = physicsUpdate.newVelocity;
+        rocket.position.y = physicsUpdate.newYPosition;
+        fuelRef.current = physicsUpdate.newFuel;
+
+        // Update UI
         setAltitude(Math.round(Math.max(0, rocket.position.y - GROUND_LEVEL) * 10) / 10);
         setSpeed(Math.round(Math.abs(velocityRef.current) * 1000) / 10);
+        setFuelPercent(Math.round(fuelRef.current * 10) / 10);
         rocket.rotation.z = Math.sin(Date.now() * 0.001) * velocityRef.current * 0.005;
       }
 
+      // Camera control - apply smooth POV following without jerking
+      controls.update();
+      
       if (followRocket && rocketRef.current) {
         const ry = rocketRef.current.position.y;
-        camera.position.y = ry + povOffsetY;
-        camera.position.x = CAMERA_OFFSET_X;
-        camera.position.z = CAMERA_OFFSET_Z;
-        camera.lookAt(rocketRef.current.position.x, rocketRef.current.position.y + 2, rocketRef.current.position.z);
-        controls.enabled = false;
-      } else {
-        controls.enabled = true;
+        const targetY = ry + povOffsetRef.current;
+        
+        // Smoothly interpolate camera position to avoid glitching
+        camera.position.y += (targetY - camera.position.y) * 0.15;
+        controls.target.set(rocketRef.current.position.x, rocketRef.current.position.y, rocketRef.current.position.z);
       }
 
-      animateParticles(delta);
-      controls.update();
+      // Lighting
+      if (rocketRef.current) {
+        baseLight.position.set(rocketRef.current.position.x, rocketRef.current.position.y - 6, rocketRef.current.position.z);
+        baseLight.intensity = thrustActiveRef.current ? 1.5 + Math.random() * 1.2 : 0.03;
+      }
+
+      // Particle animation
+      if (flameRef.current && smokeRef.current && rocketRef.current) {
+        animateParticles(delta, flameRef.current, smokeRef.current, rocketRef.current.position, velocityRef.current, particleScaleRef.current, thrustActiveRef.current);
+        animateDiamonds(diamondsRef.current, rocketRef.current.position, thrustActiveRef.current, thrustPowerRef.current);
+      }
+
       renderer.render(scene, camera);
     };
 
     animate();
 
-    const onResize = () => {
-      const cam = camera;
-      cam.aspect = window.innerWidth / window.innerHeight;
-      cam.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+    // Event handlers
+    const onPointerDown = (e: PointerEvent) => {
+      povControlStateRef.current.isDragging = true;
+      povControlStateRef.current.lastPointerY = e.clientY;
     };
-    window.addEventListener("resize", onResize);
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (!povControlStateRef.current.isDragging) return;
+      if (followRocket) {
+        const dy = e.clientY - povControlStateRef.current.lastPointerY;
+        povOffsetRef.current = povOffsetRef.current - dy * 0.05;
+        setPovOffsetY(Math.round(povOffsetRef.current * 10) / 10);
+        povControlStateRef.current.lastPointerY = e.clientY;
+      }
+    };
+
+    const onPointerUp = () => {
+      povControlStateRef.current.isDragging = false;
+    };
+
+    const onDoubleClick = () => {
+      povOffsetRef.current = CAMERA.DEFAULT_POV_OFFSET;
+      setPovOffsetY(CAMERA.DEFAULT_POV_OFFSET);
+      setFollowRocket(true);
+    };
+
+    const cleanupPointer = setupPointerControls(onPointerDown, onPointerMove, onPointerUp, onDoubleClick, renderer);
+    const cleanupResize = setupResizeListener(camera, renderer);
 
     return () => {
       cancelAnimationFrame(animId);
-      window.removeEventListener("resize", onResize);
+      cleanupPointer();
+      cleanupResize();
       renderer.dispose();
       if (mountRef.current?.contains(renderer.domElement)) {
         mountRef.current.removeChild(renderer.domElement);
@@ -230,51 +203,166 @@ export default function LiftoffPage() {
   const handleReset = () => {
     if (rocketRef.current) rocketRef.current.position.set(0, GROUND_LEVEL, 0);
     velocityRef.current = 0;
-    fuelRef.current = 100;
+    fuelRef.current = PHYSICS.INITIAL_FUEL;
     setAltitude(0);
     setSpeed(0);
-    setFuelPercent(100);
+    setFuelPercent(PHYSICS.INITIAL_FUEL);
     setThrustActive(false);
-    setPovOffsetY(4);
+    setPovOffsetY(CAMERA.DEFAULT_POV_OFFSET);
+    povOffsetRef.current = CAMERA.DEFAULT_POV_OFFSET;
   };
 
   return (
-    <div className="relative w-full h-screen">
+    <div className="relative w-full h-screen bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 overflow-hidden">
       <div ref={mountRef} className="absolute inset-0" />
 
-      <div className="absolute top-4 left-4 p-4 bg-black/80 rounded-lg text-white max-w-xs">
-        <h2 className="text-lg font-bold text-center border-b border-white/30 pb-2 mb-3">Rocket Flight Computer</h2>
+      {/* Top Bar - Telemetry */}
+      <div className="absolute top-0 left-0 right-0 h-20 bg-gradient-to-b from-cyan-950/40 to-transparent backdrop-blur-md border-b border-cyan-500/20 flex items-center px-8 gap-12 z-40">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-cyan-300 font-mono">{altitude.toFixed(1)}</div>
+            <div className="text-[10px] uppercase text-cyan-600 tracking-widest">Alt (m)</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-blue-300 font-mono">{speed.toFixed(1)}</div>
+            <div className="text-[10px] uppercase text-blue-600 tracking-widest">Speed (m/s)</div>
+          </div>
+          <div className="text-center">
+            <div className="relative inline-block">
+              <div className="text-2xl font-bold text-orange-300 font-mono">{fuelPercent.toFixed(0)}</div>
+              <div className="absolute -right-2 top-0 text-sm text-orange-300">%</div>
+            </div>
+            <div className="text-[10px] uppercase text-orange-600 tracking-widest">Fuel</div>
+            {/* Fuel bar */}
+            <div className="w-32 h-1 bg-orange-900/50 rounded-full mt-1 overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-orange-500 to-orange-300 rounded-full" style={{ width: `${fuelPercent}%` }} />
+            </div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-purple-300 font-mono">{(mass + fuelPercent * 5).toFixed(0)}</div>
+            <div className="text-[10px] uppercase text-purple-600 tracking-widest">Mass (kg)</div>
+          </div>
 
-        <div className="grid grid-cols-2 gap-3 mb-4 text-sm">
-          <div className="bg-green-900/50 p-2 rounded"><p className="text-green-300 text-xs">Altitude</p><p className="text-xl font-mono">{altitude.toFixed(1)}m</p></div>
-          <div className="bg-blue-900/50 p-2 rounded"><p className="text-blue-300 text-xs">Speed</p><p className="text-xl font-mono">{speed.toFixed(1)}m/s</p></div>
-          <div className="bg-orange-900/50 p-2 rounded"><p className="text-orange-300 text-xs">Fuel</p><p className="text-xl font-mono">{fuelPercent.toFixed(0)}%</p></div>
-          <div className="bg-purple-900/50 p-2 rounded"><p className="text-purple-300 text-xs">Mass</p><p className="text-xl font-mono">{(mass + fuelPercent * 5).toFixed(0)}kg</p></div>
+          <div className="ml-auto flex gap-3 items-center">
+            <button
+              onClick={() => setShowControls(!showControls)}
+              onKeyDown={(e) => e.key === ' ' && e.preventDefault()}
+              className={`px-4 py-2 rounded-lg font-semibold text-xs uppercase tracking-wider transition-all duration-200 select-none ${
+                showControls
+                  ? "bg-cyan-600 text-white shadow-lg shadow-cyan-500/50 border border-cyan-500"
+                  : "bg-slate-700/50 text-slate-300 hover:bg-cyan-600/30 border border-cyan-600/30"
+              }`}
+            >
+              {showControls ? "◀ Close" : "▶ Tuning"}
+            </button>
+
+            <button
+              onClick={handleReset}
+              onKeyDown={(e) => e.key === ' ' && e.preventDefault()}
+              className="px-4 py-2 rounded-lg font-semibold text-xs uppercase tracking-wider bg-yellow-600/20 text-yellow-300 border border-yellow-600/50 hover:bg-yellow-600/40 transition-all duration-200 select-none"
+            >
+              Reset
+            </button>
+
+            <label className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-xs uppercase tracking-wider cursor-pointer transition-all duration-200 select-none ${
+              thrustActive
+                ? "bg-red-600/30 text-red-300 border border-red-600/50"
+                : "bg-red-900/20 text-red-400 border border-red-900/50"
+            }`}>
+              <input 
+                type="checkbox" 
+                checked={thrustActive} 
+                onChange={e => { setThrustActive(e.target.checked); thrustActiveRef.current = e.target.checked; }} 
+                disabled={fuelPercent <= 0} 
+                className="w-4 h-4 cursor-pointer" 
+              />
+              <span>{fuelPercent <= 0 ? "No Fuel" : thrustActive ? "🔥 Firing" : "Off"}</span>
+            </label>
+
+            <label className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold text-xs uppercase tracking-wider cursor-pointer transition-all duration-200 select-none ${
+              followRocket
+                ? "bg-blue-600/30 text-blue-300 border border-blue-600/50"
+                : "bg-blue-900/20 text-blue-400 border border-blue-900/50"
+            }`}>
+              <input 
+                type="checkbox" 
+                checked={followRocket} 
+                onChange={e => setFollowRocket(e.target.checked)} 
+                className="w-4 h-4 cursor-pointer" 
+              />
+              <span>{followRocket ? "📷 Follow" : "Free"}</span>
+            </label>
+          </div>
         </div>
 
-        <label className="flex items-center gap-3 cursor-pointer bg-cyan-600 p-3 rounded mb-4">
-          <input type="checkbox" checked={followRocket} onChange={e => setFollowRocket(e.target.checked)} className="w-5 h-5" />
-          <span className="text-sm font-bold">{followRocket ? "Camera: LOCKED Y (adjustable)" : "Camera: FREE ORBIT"}</span>
-        </label>
+      {/* Right Sidebar - Controls */}
+      {showControls && (
+        <div className="absolute top-20 right-0 bottom-0 w-80 bg-gradient-to-b from-slate-800/95 to-slate-900/95 backdrop-blur-xl border-l border-cyan-500/20 overflow-y-auto p-6 space-y-6 shadow-2xl z-30">
+          <h3 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400 uppercase tracking-widest">Engine Tuning</h3>
 
-        <label className="flex items-center gap-2 cursor-pointer bg-red-600 p-3 rounded mb-3">
-          <input type="checkbox" checked={thrustActive} onChange={e => { setThrustActive(e.target.checked); thrustActiveRef.current = e.target.checked; }} disabled={fuelPercent <= 0} className="w-5 h-5" />
-          <span className="text-sm font-bold">{fuelPercent <= 0 ? "OUT OF FUEL" : thrustActive ? "ENGINE ON" : "START ENGINE"}</span>
-        </label>
+          {/* Thrust */}
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <label className="text-xs font-semibold text-slate-300">Thrust Power</label>
+              <span className="text-xs font-mono text-cyan-300">{(thrustPower * 1000).toFixed(1)}</span>
+            </div>
+            <input type="range" min="0.001" max="0.02" step="0.001" value={thrustPower} onChange={e => { setThrustPower(+e.target.value); thrustPowerRef.current = +e.target.value; }} className="w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer accent-cyan-500" />
+          </div>
 
-        <button onClick={handleReset} className="w-full bg-yellow-600 hover:bg-yellow-700 py-2 rounded font-bold">RESET LAUNCH</button>
+          {/* Gravity */}
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <label className="text-xs font-semibold text-slate-300">Gravity</label>
+              <span className="text-xs font-mono text-cyan-300">{(gravity * 1000).toFixed(2)}</span>
+            </div>
+            <input type="range" min="0" max="0.01" step="0.0001" value={gravity} onChange={e => { setGravity(+e.target.value); gravityRef.current = +e.target.value; }} className="w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer accent-cyan-500" />
+          </div>
 
-        <div className="mt-4 space-y-3 text-xs">
-          <div><label className="flex justify-between"><span>POV Y Offset</span><span>{povOffsetY.toFixed(1)}</span></label><input type="range" min="-8" max="30" step="0.5" value={povOffsetY} onChange={e => setPovOffsetY(+e.target.value)} className="w-full" /></div>
-          <div><label className="flex justify-between"><span>Thrust</span><span>{(thrustPower * 1000).toFixed(1)}</span></label><input type="range" min="0.001" max="0.02" step="0.001" value={thrustPower} onChange={e => { setThrustPower(+e.target.value); thrustPowerRef.current = +e.target.value; }} className="w-full" /></div>
-          <div><label className="flex justify-between"><span>Gravity</span><span>{(gravity * 1000).toFixed(2)}</span></label><input type="range" min="0" max="0.01" step="0.0001" value={gravity} onChange={e => { setGravity(+e.target.value); gravityRef.current = +e.target.value; }} className="w-full" /></div>
-          <div><label className="flex justify-between"><span>Mass</span><span>{mass}</span></label><input type="range" min="100" max="5000" step="100" value={mass} onChange={e => { setMass(+e.target.value); massRef.current = +e.target.value; }} className="w-full" /></div>
-          <div><label className="flex justify-between"><span>Drag</span><span>{(dragCoefficient * 10000).toFixed(1)}</span></label><input type="range" min="0" max="0.001" step="0.00001" value={dragCoefficient} onChange={e => { setDragCoefficient(+e.target.value); dragCoefficientRef.current = +e.target.value; }} className="w-full" /></div>
-          <div><label className="flex justify-between"><span>Fuel Use</span><span>{fuelConsumption.toFixed(1)}</span></label><input type="range" min="0.1" max="5" step="0.1" value={fuelConsumption} onChange={e => { setFuelConsumption(+e.target.value); fuelConsumptionRef.current = +e.target.value; }} className="w-full" /></div>
-          <div><label className="flex justify-between"><span>Flame</span><span>{particleScale.toFixed(1)}</span></label><input type="range" min="0.1" max="2" step="0.1" value={particleScale} onChange={e => { setParticleScale(+e.target.value); particleScaleRef.current = +e.target.value; }} className="w-full" /></div>
+          {/* Mass */}
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <label className="text-xs font-semibold text-slate-300">Dry Mass</label>
+              <span className="text-xs font-mono text-cyan-300">{mass} kg</span>
+            </div>
+            <input type="range" min="100" max="5000" step="100" value={mass} onChange={e => { setMass(+e.target.value); massRef.current = +e.target.value; }} className="w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer accent-cyan-500" />
+          </div>
+
+          {/* Drag Coefficient */}
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <label className="text-xs font-semibold text-slate-300">Drag Coefficient</label>
+              <span className="text-xs font-mono text-cyan-300">{(dragCoefficient * 10000).toFixed(2)}</span>
+            </div>
+            <input type="range" min="0" max="0.001" step="0.00001" value={dragCoefficient} onChange={e => { setDragCoefficient(+e.target.value); dragCoefficientRef.current = +e.target.value; }} className="w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer accent-cyan-500" />
+          </div>
+
+          {/* Fuel Consumption */}
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <label className="text-xs font-semibold text-slate-300">Fuel Consumption Rate</label>
+              <span className="text-xs font-mono text-cyan-300">{fuelConsumption.toFixed(2)}</span>
+            </div>
+            <input type="range" min="0.1" max="5" step="0.1" value={fuelConsumption} onChange={e => { setFuelConsumption(+e.target.value); fuelConsumptionRef.current = +e.target.value; }} className="w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer accent-cyan-500" />
+          </div>
+
+          {/* Particle Scale */}
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <label className="text-xs font-semibold text-slate-300">Flame Intensity</label>
+              <span className="text-xs font-mono text-cyan-300">{particleScale.toFixed(2)}</span>
+            </div>
+            <input type="range" min="0.1" max="2" step="0.1" value={particleScale} onChange={e => { setParticleScale(+e.target.value); particleScaleRef.current = +e.target.value; }} className="w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer accent-cyan-500" />
+          </div>
+
+          {/* POV Offset */}
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <label className="text-xs font-semibold text-slate-300">Camera Height</label>
+              <span className="text-xs font-mono text-cyan-300">{povOffsetY.toFixed(1)}</span>
+            </div>
+            <input type="range" min="-8" max="30" step="0.5" value={povOffsetY} onChange={e => { const v = +e.target.value; setPovOffsetY(v); povOffsetRef.current = v; }} className="w-full h-2 bg-slate-700 rounded-full appearance-none cursor-pointer accent-cyan-500" />
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
-

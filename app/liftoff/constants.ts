@@ -1,0 +1,60 @@
+export const GROUND_LEVEL = -5.5;
+
+export const PHYSICS = {
+  THRUST_POWER: 0.008,
+  GRAVITY: 0.0025,
+  MASS: 1000,
+  DRAG_COEFFICIENT: 0.0001,
+  FUEL_CONSUMPTION: 0.5,
+  INITIAL_FUEL: 100,
+};
+
+export const PARTICLES = {
+  FLAME_COUNT: 1200,
+  SMOKE_COUNT: 600,
+  PARTICLE_SCALE: 0.5,
+};
+
+export const SCENE = {
+  GROUND_WIDTH: 400,
+  GROUND_HEIGHT: 400,
+  GROUND_COLOR: 0x8b4513,
+  SKY_COLOR: 0x87ceeb,
+  FOG_NEAR: 50,
+  FOG_FAR: 200,
+};
+
+export const CAMERA = {
+  FOV: 65,
+  NEAR: 0.1,
+  FAR: 1000,
+  DEFAULT_POV_OFFSET: 4,
+};
+
+export const CONTROLS = {
+  DAMPING_FACTOR: 0.08,
+  ROTATE_SPEED: 0.6,
+  ZOOM_SPEED: 1.0,
+  PAN_SPEED: 0.8,
+};
+
+export const LIGHTING = {
+  AMBIENT_INTENSITY: 0.6,
+  DIRECTIONAL_INTENSITY: 1.1,
+  BASE_LIGHT_COLOR: 0xffa04d,
+  BASE_LIGHT_DISTANCE: 12,
+};
+
+export const DIAMONDS = {
+  COUNT: 6,
+  BASE_RADIUS: 0.6,
+  OUTER_RADIUS: 0.8,
+};
+
+export const WIND = {
+  X: 0.0004,
+  Y: 0,
+  Z: 0.00015,
+};
+
+export const NOZZLE_OFFSET = 2.2;
