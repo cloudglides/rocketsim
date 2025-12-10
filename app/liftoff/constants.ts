@@ -1,4 +1,5 @@
 export const GROUND_LEVEL = -5.5;
+export const GROUND_COLOR = 0x8b4513;
 
 export const PHYSICS = {
   THRUST_POWER: 0.008,
@@ -10,9 +11,9 @@ export const PHYSICS = {
 };
 
 export const PARTICLES = {
-  FLAME_COUNT: 1200,
-  SMOKE_COUNT: 600,
-  PARTICLE_SCALE: 0.5,
+  FLAME_COUNT: 3000,
+  SMOKE_COUNT: 1200,
+  PARTICLE_SCALE: 0.8,
 };
 
 export const SCENE = {
@@ -58,3 +59,6 @@ export const WIND = {
 };
 
 export const NOZZLE_OFFSET = 2.2;
+
+export const ROCKET_SPAWN_Y = 12;
+export const PARTICLE_SPAWN_Y_OFFSET = -10;

@@ -37,13 +37,11 @@ export function updatePhysics(
   let newYPosition = yPosition + newVelocity * delta * 60;
   let newFuel = fuel;
 
-  // Ground collision
   if (newYPosition <= GROUND_LEVEL && newVelocity < 0) {
     newYPosition = GROUND_LEVEL;
     newVelocity = 0;
   }
 
-  // Fuel consumption
   if (thrustActive && fuel > 0) {
     newFuel = Math.max(0, fuel - fuelConsumption * delta * 2);
   }

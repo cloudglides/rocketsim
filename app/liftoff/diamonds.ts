@@ -27,7 +27,9 @@ export function animateDiamonds(
   diamonds: THREE.Mesh[],
   rocketPos: { x: number; y: number; z: number },
   thrustActive: boolean,
-  thrustPower: number
+  thrustPower: number,
+  velocity: number = 0,
+  altitude: number = 0
 ) {
   const rx = rocketPos.x || 0;
   const ry = rocketPos.y || 0;
@@ -35,21 +37,42 @@ export function animateDiamonds(
   const thrustFactor = thrustActive ? Math.min(1, (thrustPower / 0.02) * 1.8) : 0;
   const nozzleY = ry - NOZZLE_OFFSET;
 
+  const altitudeChaos = Math.pow(Math.max(0, Math.min(altitude / 300, 1)), 1.5);
+  const speedChaos = Math.min(Math.abs(velocity) * 0.3, 2.5);
+  const totalChaos = altitudeChaos + speedChaos;
+
   for (let i = 0; i < diamonds.length; i++) {
     const ring = diamonds[i];
     const spacing = 0.9 + i * 0.6;
-    const y = nozzleY - spacing * (1 + thrustFactor * 3);
-    ring.position.set(rx, y, rz);
+
+    const chaosSpacing = spacing * (1 + thrustFactor * 3.5 + totalChaos * 4);
+    const y = nozzleY - chaosSpacing;
+
+    const perturbX = (Math.random() - 0.5) * totalChaos * 0.8;
+    const perturbZ = (Math.random() - 0.5) * totalChaos * 0.8;
+    ring.position.set(rx + perturbX, y, rz + perturbZ);
 
     const baseScale = 0.6 + i * 0.25 + thrustFactor * (0.8 + i * 0.2);
-    ring.scale.set(baseScale, baseScale, baseScale);
+    const chaosScale = baseScale * (1 + totalChaos * 0.6);
+    ring.scale.set(chaosScale, chaosScale, chaosScale);
 
-    const phase = (Date.now() * 0.002 + i * 0.5) % Math.PI;
-    const glow = Math.max(0, Math.sin(phase) * 0.6 + thrustFactor * 1.2);
+    const time = Date.now() * 0.003;
+    const chaosRotation = totalChaos * 0.05;
+    ring.rotation.x = Math.PI / 2 + Math.sin(time + i) * chaosRotation;
+    ring.rotation.z = Math.cos(time * 0.7 + i) * chaosRotation;
+
+    const phase = time + i * 0.5;
+    const glow = Math.max(0, Math.sin(phase) * 0.8 + thrustFactor * 1.5);
+
+    const chaosGlow = glow * (1 + totalChaos * 0.8);
 
     const mat = ring.material as THREE.MeshBasicMaterial;
-    mat.opacity = Math.min(1, glow * (1 - i * 0.12));
-    mat.color.setHSL(0.07, 1, Math.min(0.9, 0.35 + glow * 0.6));
+    mat.opacity = Math.min(1, chaosGlow * (1 - i * 0.1));
+
+    const chaosHue = 0.07 - Math.min(totalChaos * 0.02, 0.05);
+    const chaosSat = Math.max(0.6, 1 - totalChaos * 0.1);
+    mat.color.setHSL(chaosHue, chaosSat, Math.min(0.9, 0.35 + chaosGlow * 0.8));
+
     ring.visible = thrustFactor > 0.02;
   }
 }

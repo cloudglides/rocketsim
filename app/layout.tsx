@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Liftoff - Rocket Simulator",
-  description: "3D rocket flight simulator with physics",
+  title: "liftoff",
+  description: "a pretty minimal rocket sim, built with threejs",
 };
 
 export default function RootLayout({

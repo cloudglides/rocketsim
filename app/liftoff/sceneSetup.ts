@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
-import { SCENE, CAMERA, CONTROLS, LIGHTING, GROUND_LEVEL } from "./constants";
+import { SCENE, CAMERA, CONTROLS, LIGHTING, GROUND_LEVEL, GROUND_COLOR } from "./constants";
 
 export function setupScene() {
   const scene = new THREE.Scene();
@@ -47,14 +47,14 @@ export function setupLighting(scene: THREE.Scene) {
 }
 
 export function setupGround(scene: THREE.Scene) {
-  const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry(SCENE.GROUND_WIDTH, SCENE.GROUND_HEIGHT),
-    new THREE.MeshStandardMaterial({ color: SCENE.GROUND_COLOR, roughness: 0.95 })
-  );
-  ground.rotation.x = -Math.PI / 2;
-  ground.position.y = -10;
-  scene.add(ground);
-}
+   const ground = new THREE.Mesh(
+     new THREE.PlaneGeometry(SCENE.GROUND_WIDTH, SCENE.GROUND_HEIGHT),
+     new THREE.MeshStandardMaterial({ color: GROUND_COLOR, roughness: 0.95 })
+   );
+   ground.rotation.x = -Math.PI / 2;
+   ground.position.y = -10;
+   scene.add(ground);
+ }
 
 export function loadRocket(scene: THREE.Scene, groundLevel: number): Promise<THREE.Group> {
   return new Promise((resolve) => {
