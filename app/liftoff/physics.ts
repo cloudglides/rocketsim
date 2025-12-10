@@ -1,4 +1,4 @@
-import { GROUND_LEVEL } from "./constants";
+import { GROUND_LEVEL, GRAVITY_TRANSITION_START, GRAVITY_TRANSITION_END, SCALE_FACTOR } from "./constants";
 
 export interface PhysicsState {
   velocity: number;
@@ -52,4 +52,23 @@ export function updatePhysics(
 export function calculateThrust(thrustActive: boolean, thrustPower: number, fuel: number): number {
   if (!thrustActive || fuel <= 0) return 0;
   return thrustPower;
+}
+
+export function calculateGravityWithAltitude(baseGravity: number, altitude: number): number {
+  const altitudeKm = altitude * SCALE_FACTOR;
+
+  if (altitudeKm < GRAVITY_TRANSITION_START) {
+    return baseGravity;
+  }
+
+  if (altitudeKm < GRAVITY_TRANSITION_END) {
+    const ratio = (altitudeKm - GRAVITY_TRANSITION_START) / (GRAVITY_TRANSITION_END - GRAVITY_TRANSITION_START);
+    return baseGravity * (1 - ratio);
+  }
+
+  if (altitudeKm < 500) {
+    return baseGravity * 0.05;
+  }
+
+  return 0;
 }

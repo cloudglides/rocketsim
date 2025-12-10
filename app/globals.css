@@ -102,43 +102,132 @@ label:hover {
   background: rgba(6, 182, 212, 0.7);
 }
 
-/* Top Bar */
-.telemetry-bar {
+/* Bottom Bar */
+.telemetry-bottom {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  background: rgba(0, 0, 0, 0.5);
+  bottom: 470px;
+  left: 20px;
+  display: flex;
+  gap: 24px;
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(8px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(0, 255, 100, 0.3);
+  border-radius: 8px;
+  padding: 16px 20px;
   z-index: 40;
 }
 
-.telemetry-metrics {
+.altitude-tape {
   display: flex;
-  gap: 24px;
-  padding: 12px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
-.metric {
-  flex: 0 0 auto;
-}
-
-.metric-label {
-  font-size: 10px;
+.altitude-tape-label {
+  font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 2px;
-  font-weight: 600;
-  margin-bottom: 4px;
-  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 1px;
+  font-weight: 700;
+  color: rgba(0, 255, 100, 0.8);
 }
 
-.metric-value {
-  font-size: 20px;
+.altitude-tape-window {
+  position: relative;
+  width: 60px;
+  height: 120px;
+  border: 2px solid rgba(0, 255, 100, 0.6);
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(0, 20, 30, 0.9);
+  box-shadow: inset 0 0 8px rgba(0, 255, 100, 0.1);
+}
+
+.altitude-tape-scale {
+  position: absolute;
+  top: 60px;
+  left: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.05s linear;
+}
+
+.altitude-tape-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 15px;
+  border-bottom: 1px solid rgba(0, 255, 100, 0.2);
+  font-size: 8px;
+  color: rgba(0, 255, 100, 0.5);
+  font-weight: 600;
+}
+
+.altitude-tape-mark.major {
+  border-bottom: 2px solid rgba(0, 255, 100, 0.6);
+  color: rgba(0, 255, 100, 0.9);
+  font-size: 9px;
+}
+
+.altitude-tape-pointer {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 3px;
+  background: #ff6600;
+  transform: translateX(-50%) translateY(-50%);
+  pointer-events: none;
+  box-shadow: 0 0 8px rgba(255, 100, 0, 0.8);
+}
+
+.metrics-panel {
+  display: flex;
+  gap: 32px;
+}
+
+.metric-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-item .metric-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 700;
+  color: rgba(0, 255, 100, 0.7);
+  margin: 0;
+}
+
+.metric-item .metric-value {
+  font-size: 18px;
   font-weight: bold;
   font-family: 'Courier New', monospace;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(0, 255, 100, 0.9);
+}
+
+.orbit-indicator {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #00ff00;
+  font-size: 16px;
+  font-weight: bold;
+  animation: orbit-pulse 1s ease-in-out infinite;
+}
+
+@keyframes orbit-pulse {
+  0%, 100% {
+    text-shadow: 0 0 8px rgba(0, 255, 100, 0.5);
+  }
+  50% {
+    text-shadow: 0 0 16px rgba(0, 255, 100, 1);
+  }
 }
 
 .controls-box {

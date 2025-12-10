@@ -13,14 +13,13 @@ export function createFlames(): THREE.Points {
   const fLife = new Float32Array(flameCount);
 
   for (let i = 0; i < flameCount; i++) {
-    // Particles start far below, invisible until spawned
     fPos[i * 3] = 0;
     fPos[i * 3 + 1] = -500;
     fPos[i * 3 + 2] = 0;
     fVel[i * 3] = 0;
     fVel[i * 3 + 1] = 0;
     fVel[i * 3 + 2] = 0;
-    fLife[i] = 1.0; // Start with full life to be recycled immediately
+    fLife[i] = 1.0;
   }
 
   const flameGeo = new THREE.BufferGeometry();
@@ -52,14 +51,13 @@ export function createSmokes(): THREE.Points {
   const sLife = new Float32Array(smokeCount);
 
   for (let i = 0; i < smokeCount; i++) {
-    // Particles start far below, invisible until spawned
     sPos[i * 3] = 0;
     sPos[i * 3 + 1] = -500;
     sPos[i * 3 + 2] = 0;
     sVel[i * 3] = 0;
     sVel[i * 3 + 1] = 0;
     sVel[i * 3 + 2] = 0;
-    sLife[i] = 1.0; // Start with full life to be recycled immediately
+    sLife[i] = 1.0;
   }
 
   const smokeGeo = new THREE.BufferGeometry();
@@ -93,7 +91,8 @@ export function animateParticles(
   thrustActive: boolean,
   altitude: number = 0,
   thrustPower: number = 0.008,
-  particleSpawnYOffset: number = 0
+  particleSpawnYOffset: number = 0,
+  rocketRotation: { x: number; z: number } = { x: 0, z: 0 }
 ) {
   const flamePos = flameRef.geometry.attributes.position.array as Float32Array;
   const flameVel = flameRef.geometry.attributes.velocity.array as Float32Array;
@@ -115,11 +114,15 @@ export function animateParticles(
   const totalChaos = (speedChaos + altitudeChaos) * (0.8 + thrustFactor * 0.4);
   const altitudeFactor = Math.max(0.5, 1 - ry / 1000);
 
+  const thrustDirX = Math.sin(rocketRotation.z);
+  const thrustDirY = -Math.cos(rocketRotation.z) * Math.cos(rocketRotation.x);
+  const thrustDirZ = Math.sin(rocketRotation.x);
+
   for (let i = 0; i < flamePos.length / 3; i++) {
     if (thrustActive) {
       flameLife[i] += delta * (2.0 + speedChaos * 0.6);
     } else {
-      flameLife[i] += delta * 3.0; // Fade out faster when thrust is off
+      flameLife[i] += delta * 3.0;
     }
 
     const chaos = (Math.random() - 0.5) * totalChaos * 0.4;
@@ -134,24 +137,24 @@ export function animateParticles(
     if (flamePos[i * 3 + 1] < nozzleY - 20 || flameLife[i] > 0.8) {
       const spreadRadius = 0.5 + totalChaos * 0.4;
       const thrustOffset = 2 + thrustFactor * 3;
-      flamePos[i * 3] = rx + (Math.random() - 0.5) * spreadRadius;
-      flamePos[i * 3 + 1] = nozzleY - thrustOffset + particleSpawnYOffset + (Math.random() - 0.5) * 0.3;
-      flamePos[i * 3 + 2] = rz + (Math.random() - 0.5) * spreadRadius;
+      
+      flamePos[i * 3] = rx + thrustDirX * thrustOffset + (Math.random() - 0.5) * spreadRadius;
+      flamePos[i * 3 + 1] = ry + thrustDirY * thrustOffset + particleSpawnYOffset + (Math.random() - 0.5) * 0.3;
+      flamePos[i * 3 + 2] = rz + thrustDirZ * thrustOffset + (Math.random() - 0.5) * spreadRadius;
 
       const thrustVelocity = 1.5 + thrustFactor * 1.5;
-      flameVel[i * 3] = (Math.random() - 0.5) * (0.3 + totalChaos * 0.2);
-      flameVel[i * 3 + 1] = -Math.random() * (thrustVelocity + totalChaos * 0.5) - 0.8;
-      flameVel[i * 3 + 2] = (Math.random() - 0.5) * (0.3 + totalChaos * 0.2);
+      flameVel[i * 3] = thrustDirX * (thrustVelocity + totalChaos * 0.5) + (Math.random() - 0.5) * (0.3 + totalChaos * 0.2);
+      flameVel[i * 3 + 1] = thrustDirY * (thrustVelocity + totalChaos * 0.5) - Math.random() * 0.8;
+      flameVel[i * 3 + 2] = thrustDirZ * (thrustVelocity + totalChaos * 0.5) + (Math.random() - 0.5) * (0.3 + totalChaos * 0.2);
       flameLife[i] = 0;
     }
   }
 
-  // Update smokes - rises and disperses based on speed/altitude
   for (let i = 0; i < smokePos.length / 3; i++) {
     if (thrustActive) {
       smokeLife[i] += delta * (0.15 + speedChaos * 0.1);
     } else {
-      smokeLife[i] += delta * 0.5; // Fade out slower
+      smokeLife[i] += delta * 0.5;
     }
 
     const dispersion = (Math.random() - 0.5) * totalChaos * 0.25;
@@ -162,20 +165,19 @@ export function animateParticles(
     smokeVel[i * 3] *= 0.997;
     smokeVel[i * 3 + 2] *= 0.997;
 
-    // Reset particle - shorter life at higher altitude
     const maxLife = thrustActive ? 2.5 + altitudeFactor : 1.5;
     if (smokeLife[i] > maxLife) {
       const dispersionRadius = 0.5 + totalChaos * 0.3;
       const thrustOffset = 1.5 + thrustFactor * 2.5;
-      smokePos[i * 3] = rx + (Math.random() - 0.5) * dispersionRadius;
-      smokePos[i * 3 + 1] = nozzleY - thrustOffset + particleSpawnYOffset + (Math.random() - 0.5) * 0.2;
-      smokePos[i * 3 + 2] = rz + (Math.random() - 0.5) * dispersionRadius;
+      
+      smokePos[i * 3] = rx + thrustDirX * thrustOffset + (Math.random() - 0.5) * dispersionRadius;
+      smokePos[i * 3 + 1] = ry + thrustDirY * thrustOffset + particleSpawnYOffset + (Math.random() - 0.5) * 0.2;
+      smokePos[i * 3 + 2] = rz + thrustDirZ * thrustOffset + (Math.random() - 0.5) * dispersionRadius;
 
-      // Smoke velocity increases with thrust
       const smokeVelMult = 0.8 + thrustFactor * 0.4;
-      smokeVel[i * 3] = (Math.random() - 0.5) * (0.08 + totalChaos * 0.04) * smokeVelMult;
-      smokeVel[i * 3 + 1] = Math.random() * (0.08 + totalChaos * 0.04) * smokeVelMult;
-      smokeVel[i * 3 + 2] = (Math.random() - 0.5) * (0.08 + totalChaos * 0.04) * smokeVelMult;
+      smokeVel[i * 3] = thrustDirX * (0.08 + totalChaos * 0.04) * smokeVelMult + (Math.random() - 0.5) * (0.08 + totalChaos * 0.04) * smokeVelMult;
+      smokeVel[i * 3 + 1] = thrustDirY * (0.08 + totalChaos * 0.04) * smokeVelMult + Math.random() * (0.08 + totalChaos * 0.04) * smokeVelMult;
+      smokeVel[i * 3 + 2] = thrustDirZ * (0.08 + totalChaos * 0.04) * smokeVelMult + (Math.random() - 0.5) * (0.08 + totalChaos * 0.04) * smokeVelMult;
       smokeLife[i] = 0;
     }
   }

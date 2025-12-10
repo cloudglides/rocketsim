@@ -1,13 +1,14 @@
 export const GROUND_LEVEL = -5.5;
+export const GROUND_Y = -17;
 export const GROUND_COLOR = 0x8b4513;
 
 export const PHYSICS = {
-  THRUST_POWER: 0.008,
+  THRUST_POWER: 0.012,
   GRAVITY: 0.0025,
   MASS: 1000,
   DRAG_COEFFICIENT: 0.0001,
-  FUEL_CONSUMPTION: 0.5,
-  INITIAL_FUEL: 100,
+  FUEL_CONSUMPTION: 0.3,
+  INITIAL_FUEL: 200,
 };
 
 export const PARTICLES = {
@@ -60,5 +61,11 @@ export const WIND = {
 
 export const NOZZLE_OFFSET = 2.2;
 
-export const ROCKET_SPAWN_Y = 12;
-export const PARTICLE_SPAWN_Y_OFFSET = -10;
+export const ROCKET_SPAWN_Y = 0;
+export const PARTICLE_SPAWN_Y_OFFSET = -5;
+
+export const ORBITAL_ALTITUDE = 160;
+export const ORBITAL_VELOCITY = 7.8;
+export const GRAVITY_TRANSITION_START = 50;
+export const GRAVITY_TRANSITION_END = 200;
+export const SCALE_FACTOR = 0.1;
