@@ -1,5 +1,4 @@
 
-
 export const PHYSICS = {
   THRUST_POWER: 0.012,
   GRAVITY: 0.0025,

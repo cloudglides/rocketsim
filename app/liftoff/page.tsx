@@ -9,7 +9,7 @@ import { calculateAcceleration, updatePhysics, calculateThrust, calculateGravity
 import { setupPointerControls, setupResizeListener, handlePOVDrag, type POVControlState } from "./controls";
 import { GROUND_LEVEL, PHYSICS, CAMERA, PARTICLES, ROCKET_SPAWN_Y, PARTICLE_SPAWN_Y_OFFSET, ORBITAL_ALTITUDE, ORBITAL_VELOCITY, SCALE_FACTOR, MAX_SPEED_KMS, SPEED_SHAKE_THRESHOLD } from "./constants";
 import { createStarfield, createPlanetGlow, createNebulaBackground } from "./space";
-import { OrbitScreen } from "./OrbitScreen";
+import { OrbitView } from "./OrbitView";
 
 export default function LiftoffPage() {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -26,8 +26,7 @@ export default function LiftoffPage() {
   const trailPositionsRef = useRef<number[]>([]);
   const trailOpacitiesRef = useRef<number[]>([]);
   const groundRef = useRef<THREE.Mesh | null>(null);
-  const rocketCrashedRef = useRef(false);
-  const crashMessageRef = useRef('');
+
 
   const velocityRef = useRef(0);
   const fuelRef = useRef(PHYSICS.INITIAL_FUEL);
@@ -53,6 +52,7 @@ export default function LiftoffPage() {
   const [orbitMode, setOrbitMode] = useState(false);
   const [gameState, setGameState] = useState<'ready' | 'flying' | 'orbit' | 'crashed'>('ready');
   const [orbitCelebrationTime, setOrbitCelebrationTime] = useState(0);
+  const [fadeOut, setFadeOut] = useState(false);
   const hasLaunchedRef = useRef(false);
   const orbitAchievementTimeRef = useRef(0);
 
@@ -63,8 +63,7 @@ export default function LiftoffPage() {
   const [particleScale, setParticleScale] = useState(PARTICLES.PARTICLE_SCALE);
   const [fuelConsumption, setFuelConsumption] = useState(PHYSICS.FUEL_CONSUMPTION);
   const [povOffsetY, setPovOffsetY] = useState(CAMERA.DEFAULT_POV_OFFSET);
-  const [rocketCrashed, setRocketCrashed] = useState(false);
-  const [crashMessage, setCrashMessage] = useState('');
+
   const [rendererBackend, setRendererBackend] = useState<'WebGPU' | 'WebGL'>('WebGL');
 
   const povControlStateRef = useRef<POVControlState>({ isDragging: false, lastPointerY: 0 });
@@ -257,25 +256,7 @@ export default function LiftoffPage() {
         const rotationDamping = 0.68;
         const maxRotation = Math.PI / 1.8;
 
-        if (keysPressed.current['ArrowLeft']) {
-          rocket.rotation.x -= rotationSpeed;
-        }
-        if (keysPressed.current['ArrowRight']) {
-          rocket.rotation.x += rotationSpeed;
-        }
-        if (keysPressed.current['ArrowUp']) {
-          rocket.rotation.z += rotationSpeed;
-        }
-        if (keysPressed.current['ArrowDown']) {
-          rocket.rotation.z -= rotationSpeed;
-        }
 
-        if (!keysPressed.current['ArrowLeft'] && !keysPressed.current['ArrowRight']) {
-          rocket.rotation.x *= rotationDamping;
-        }
-        if (!keysPressed.current['ArrowUp'] && !keysPressed.current['ArrowDown']) {
-          rocket.rotation.z *= rotationDamping;
-        }
 
         rocket.rotation.x = Math.max(-maxRotation, Math.min(maxRotation, rocket.rotation.x));
         rocket.rotation.z = Math.max(-maxRotation, Math.min(maxRotation, rocket.rotation.z));
@@ -342,20 +323,13 @@ export default function LiftoffPage() {
 
         const newAltitudeKm = newAltitude * SCALE_FACTOR;
         const speedKmS = totalVelocityMagnitude * SCALE_FACTOR;
-        const inOrbitNow = newAltitudeKm >= ORBITAL_ALTITUDE && speedKmS >= ORBITAL_VELOCITY * 0.9;
+        const inOrbitNow = newAltitudeKm >= 1000;
 
-        if (newAltitudeKm > 40) {
-          console.log(`Alt: ${newAltitudeKm.toFixed(1)}km (need ${ORBITAL_ALTITUDE}), Speed: ${speedKmS.toFixed(2)}km/s (need ${(ORBITAL_VELOCITY * 0.9).toFixed(2)}), inOrbit: ${inOrbitNow}`);
-        }
-
+        const inAtmosphere = newAltitudeKm < 100;
         const dragScaleFactor = Math.max(0.5, 1 - dragCoefficientRef.current * 5000);
         const crashThreshold = MAX_SPEED_KMS * dragScaleFactor;
 
-        if (speedKmS > crashThreshold && !rocketCrashedRef.current) {
-          rocketCrashedRef.current = true;
-          crashMessageRef.current = 'BOOM';
-          setCrashMessage('BOOM');
-          setRocketCrashed(true);
+        if (inAtmosphere && speedKmS > crashThreshold && gameState === 'flying') {
           setGameState('crashed');
           thrustActiveRef.current = false;
         }
@@ -365,20 +339,12 @@ export default function LiftoffPage() {
         }
 
         if (inOrbitNow && !inOrbit) {
-          console.log('ORBIT DETECTED!');
           setInOrbit(true);
           setGameState('orbit');
-          setOrbitCelebrationTime(3);
-          orbitAchievementTimeRef.current = 0;
-        }
-
-        if (inOrbit && !orbitMode) {
-          orbitAchievementTimeRef.current += delta;
-          console.log(`Orbit timer: ${orbitAchievementTimeRef.current.toFixed(2)}s / 4s, orbitMode: ${orbitMode}`);
-          if (orbitAchievementTimeRef.current > 4) {
-            console.log('SETTING ORBIT MODE!');
+          setFadeOut(true);
+          setTimeout(() => {
             setOrbitMode(true);
-          }
+          }, 1200);
         }
       }
 
@@ -389,24 +355,6 @@ export default function LiftoffPage() {
       }
 
       let dragShake = 0;
-      if (rocketRef.current && !rocketCrashedRef.current) {
-        const totalVelMag = Math.sqrt(
-          velocityRef.current * velocityRef.current +
-          lateralVelocityXRef.current * lateralVelocityXRef.current +
-          lateralVelocityZRef.current * lateralVelocityZRef.current
-        );
-        const speedKmS = (Math.round(Math.abs(totalVelMag) * 1000) / 10) / 1000;
-
-        const dragScaleFactor = Math.max(0.5, 1 - dragCoefficientRef.current * 5000);
-        const dynamicSpeedLimit = MAX_SPEED_KMS * dragScaleFactor;
-
-        if (speedKmS > SPEED_SHAKE_THRESHOLD) {
-          const excessSpeed = speedKmS - SPEED_SHAKE_THRESHOLD;
-          const speedRangeToLimit = dynamicSpeedLimit - SPEED_SHAKE_THRESHOLD;
-          const shakeIntensity = Math.pow(Math.max(0, excessSpeed / speedRangeToLimit), 1.5);
-          dragShake = Math.sin(performance.now() * 0.015) * Math.min(1, shakeIntensity) * 0.6;
-        }
-      }
 
       const thrustShake = (thrustActiveRef.current && fuelRef.current > 0 ? 0.15 : 0);
       const launchShake = hasLaunchedRef.current && fuelRef.current > 0 ? 0.08 : 0;
@@ -505,10 +453,6 @@ export default function LiftoffPage() {
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-        e.preventDefault();
-        keysPressed.current[e.key] = true;
-      }
       if (e.code === 'Space') {
         e.preventDefault();
         setThrustActive(true);
@@ -517,9 +461,6 @@ export default function LiftoffPage() {
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-        keysPressed.current[e.key] = false;
-      }
       if (e.code === 'Space') {
         setThrustActive(false);
         thrustActiveRef.current = false;
@@ -560,27 +501,19 @@ export default function LiftoffPage() {
     setPovOffsetY(CAMERA.DEFAULT_POV_OFFSET);
     povOffsetRef.current = CAMERA.DEFAULT_POV_OFFSET;
     hasLaunchedRef.current = false;
-    rocketCrashedRef.current = false;
-    crashMessageRef.current = '';
-    setRocketCrashed(false);
-    setCrashMessage('');
   };
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
       {orbitMode && (
-        <OrbitScreen
+        <OrbitView
           altitude={altitude}
           speed={speed}
-          onContinue={() => {
-            setOrbitMode(false);
-            handleReset();
-          }}
         />
       )}
-      <div ref={mountRef} className="absolute inset-0" />
+      {!orbitMode && <div ref={mountRef} className="absolute inset-0" />}
 
-      <div className="controls-box">
+      {!orbitMode && <div className="controls-box">
         <button
           onClick={handleReset}
           onKeyDown={(e) => e.key === ' ' && e.preventDefault()}
@@ -611,9 +544,9 @@ export default function LiftoffPage() {
             <span>{followRocket ? "Follow" : "Free"}</span>
           </label>
         </div>
-      </div>
+      </div>}
 
-      <div className="config-box">
+      {!orbitMode && <div className="config-box">
         <div className="config-title">Options</div>
 
         <div className="config-section">
@@ -722,9 +655,9 @@ export default function LiftoffPage() {
 
 
         </div>
-      </div>
+      </div>}
 
-      <div className="hud-minimal">
+      {!orbitMode && <div className="hud-minimal">
         <div className="hud-corner-top-left">
           V {(speed / 1000).toFixed(2)}<br/>
           <span style={{fontSize: '11px', opacity: 0.7}}>km/s</span>
@@ -747,32 +680,25 @@ export default function LiftoffPage() {
             />
           </div>
         </div>
-      </div>
+      </div>}
 
-      {rocketCrashed && (
+
+
+      {fadeOut && (
         <div style={{
           position: 'fixed',
-          bottom: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          fontSize: '96px',
-          fontWeight: 'bold',
-          color: '#ff0000',
-          fontFamily: 'monospace',
-          letterSpacing: '8px',
-          textShadow: '0 0 30px #ff0000, 0 0 60px #ff3333, 0 0 90px #ff0000',
-          animation: 'crash-pulse 0.3s infinite',
-          zIndex: 100,
-          filter: 'drop-shadow(0 0 20px rgba(255,0,0,0.8))',
-        }}>
-          {crashMessage}
-        </div>
+          inset: 0,
+          backgroundColor: '#000000',
+          animation: 'fadeInToBlack 1.2s ease-in forwards',
+          zIndex: 40,
+          pointerEvents: 'none'
+        }} />
       )}
 
       <style jsx>{`
-        @keyframes crash-pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.7; transform: scale(1.05); }
+        @keyframes fadeInToBlack {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
         }
       `}</style>
     </div>

@@ -16,60 +16,42 @@ export function setupCamera(width: number, height: number, povOffset: number) {
   return camera;
 }
 
-export function setupRenderer(container: HTMLDivElement): THREE.WebGLRenderer | any {
-   let renderer: THREE.WebGLRenderer | any;
+export function setupRenderer(container: HTMLDivElement): THREE.WebGLRenderer {
+  const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    powerPreference: 'high-performance',
+    preserveDrawingBuffer: false,
+    alpha: false
+  });
 
-   if ((navigator as any).gpu) {
-     try {
-       renderer = createWebGPURenderer();
-       console.log("WebGPU renderer initialized");
-     } catch (e) {
-       console.warn("WebGPU initialization failed, falling back to WebGL", e);
-       renderer = createWebGLRenderer();
-     }
-   } else {
-     renderer = createWebGLRenderer();
-   }
+  if ((navigator as any).gpu) {
+    initWebGPUAsync(renderer).catch(() => {
+      console.warn("WebGPU not available, using WebGL");
+    });
+  }
 
-   renderer.setSize(window.innerWidth, window.innerHeight);
-   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-   renderer.outputColorSpace = THREE.SRGBColorSpace;
-   container.appendChild(renderer.domElement);
-   return renderer;
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  container.appendChild(renderer.domElement);
+  return renderer;
 }
 
-function createWebGLRenderer(): THREE.WebGLRenderer {
-   return new THREE.WebGLRenderer({
-     antialias: true,
-     powerPreference: 'high-performance',
-     preserveDrawingBuffer: false,
-     alpha: false
-   });
-}
+async function initWebGPUAsync(renderer: THREE.WebGLRenderer) {
+  try {
+    const adapter = await (navigator as any).gpu.requestAdapter();
+    if (!adapter) {
+      console.warn("No WebGPU adapter available");
+      return;
+    }
 
-async function createWebGPURenderer(): Promise<any> {
-   try {
-     const adapter = await (navigator as any).gpu?.requestAdapter();
-     if (!adapter) throw new Error("No WebGPU adapter found");
-
-     const device = await adapter.requestDevice();
-     console.log("WebGPU device created successfully");
-
-     const renderer = new THREE.WebGLRenderer({
-       antialias: true,
-       powerPreference: 'high-performance',
-       preserveDrawingBuffer: false,
-       alpha: false
-     });
-
-     (renderer as any).webgpuDevice = device;
-     (renderer as any).webgpuAdapter = adapter;
-
-     return renderer;
-   } catch (e) {
-     console.error("WebGPU setup failed:", e);
-     throw e;
-   }
+    const device = await adapter.requestDevice();
+    (renderer as any).webgpuDevice = device;
+    (renderer as any).webgpuAdapter = adapter;
+    console.log("WebGPU initialized");
+  } catch (e) {
+    console.warn("WebGPU init failed:", e);
+  }
 }
 
 export function setupControls(camera: THREE.Camera, renderer: THREE.WebGLRenderer) {
@@ -95,15 +77,15 @@ export function setupLighting(scene: THREE.Scene) {
 }
 
 export function setupGround(scene: THREE.Scene) {
-   const ground = new THREE.Mesh(
-     new THREE.PlaneGeometry(SCENE.GROUND_WIDTH, SCENE.GROUND_HEIGHT),
-     new THREE.MeshStandardMaterial({ color: GROUND_COLOR, roughness: 0.95 })
-   );
-   ground.rotation.x = -Math.PI / 2;
-   ground.position.y = GROUND_Y;
-   scene.add(ground);
-   return ground;
- }
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(SCENE.GROUND_WIDTH, SCENE.GROUND_HEIGHT),
+    new THREE.MeshStandardMaterial({ color: GROUND_COLOR, roughness: 0.95 })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = GROUND_Y;
+  scene.add(ground);
+  return ground;
+}
 
 export function loadRocket(scene: THREE.Scene, groundLevel: number): Promise<THREE.Group> {
   return new Promise((resolve) => {

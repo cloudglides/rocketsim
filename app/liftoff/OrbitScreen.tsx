@@ -74,7 +74,7 @@ export function OrbitScreen({ altitude, speed, onContinue }: OrbitScreenProps) {
       ctx.arc(128, 128, (i + 1) * 50, 0, Math.PI * 2);
       ctx.stroke();
     }
-    
+
 
     const glowGeometry = new THREE.BufferGeometry();
     const glowPositions = new Float32Array(65 * 3);
@@ -194,18 +194,15 @@ export function OrbitScreen({ altitude, speed, onContinue }: OrbitScreenProps) {
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
       <div ref={canvasRef} className="flex-1 relative">
-        {/* Orbit UI Overlay */}
         <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-8">
-          {/* Top section */}
           <div className="space-y-6">
             <div className="text-center">
-              <h1 className="text-5xl font-bold text-white mb-3 font-mono" style={{letterSpacing: '2px'}}>
+              <h1 className="text-5xl font-bold text-white mb-3 font-mono" style={{ letterSpacing: '2px' }}>
                 ◆ ORBIT ACHIEVED ◆
               </h1>
               <p className="text-white text-sm font-mono tracking-widest">MISSION STATUS: SUCCESS</p>
             </div>
 
-            {/* HUD Grid */}
             <div className="grid grid-cols-2 gap-6 max-w-sm mx-auto">
               <div className="border-2 border-white p-4 bg-black/60 backdrop-blur">
                 <p className="text-white text-xs font-mono tracking-wider mb-1">ALTITUDE</p>
@@ -229,7 +226,6 @@ export function OrbitScreen({ altitude, speed, onContinue }: OrbitScreenProps) {
             </div>
           </div>
 
-          {/* Bottom section */}
           <div className="space-y-4 flex flex-col items-center">
             <p className="text-white text-center text-sm max-w-md font-mono tracking-tight">
               Welcome to orbital insertion. Your rocket is now in stable orbit around Earth.
