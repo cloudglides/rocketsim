@@ -21,7 +21,6 @@ export function createFlames(): THREE.Points {
     fVel[i * 3 + 1] = 0;
     fVel[i * 3 + 2] = 0;
     fLife[i] = 1.0;
-    // Initialize color to yellow/orange
     fColor[i * 3] = 1.0;
     fColor[i * 3 + 1] = 0.7;
     fColor[i * 3 + 2] = 0.0;
@@ -44,50 +43,48 @@ export function createFlames(): THREE.Points {
   });
 
   const flames = new THREE.Points(flameGeo, flameMat);
-  flames.visible = true;
-  flames.frustumCulled = false;
-  // Compute bounding sphere once at creation, don't recalculate every frame
-  flameGeo.computeBoundingSphere();
-  return flames;
-}
-
-export function createSmokes(): THREE.Points {
-  const smokeCount = PARTICLES.SMOKE_COUNT;
-  const sPos = new Float32Array(smokeCount * 3);
-  const sVel = new Float32Array(smokeCount * 3);
-  const sLife = new Float32Array(smokeCount);
-
-  for (let i = 0; i < smokeCount; i++) {
-    sPos[i * 3] = 0;
-    sPos[i * 3 + 1] = -500;
-    sPos[i * 3 + 2] = 0;
-    sVel[i * 3] = 0;
-    sVel[i * 3 + 1] = 0;
-    sVel[i * 3 + 2] = 0;
-    sLife[i] = 1.0;
+   flames.visible = true;
+   flames.frustumCulled = false;
+   flameGeo.computeBoundingSphere();
+   return flames;
   }
 
-  const smokeGeo = new THREE.BufferGeometry();
-  smokeGeo.setAttribute("position", new THREE.BufferAttribute(sPos, 3));
-  smokeGeo.setAttribute("velocity", new THREE.BufferAttribute(sVel, 3));
-  smokeGeo.setAttribute("lifetime", new THREE.BufferAttribute(sLife, 1));
+  export function createSmokes(): THREE.Points {
+   const smokeCount = PARTICLES.SMOKE_COUNT;
+   const sPos = new Float32Array(smokeCount * 3);
+   const sVel = new Float32Array(smokeCount * 3);
+   const sLife = new Float32Array(smokeCount);
 
-  const smokeMat = new THREE.PointsMaterial({
-    color: 0x999999,
-    size: PARTICLES.PARTICLE_SCALE * 2.2,
-    transparent: true,
-    opacity: 0.45,
-    depthWrite: false,
-    fog: false,
-  });
+   for (let i = 0; i < smokeCount; i++) {
+     sPos[i * 3] = 0;
+     sPos[i * 3 + 1] = -500;
+     sPos[i * 3 + 2] = 0;
+     sVel[i * 3] = 0;
+     sVel[i * 3 + 1] = 0;
+     sVel[i * 3 + 2] = 0;
+     sLife[i] = 1.0;
+   }
 
-  const smokes = new THREE.Points(smokeGeo, smokeMat);
-  smokes.visible = true;
-  smokes.frustumCulled = false;
-  // Compute bounding sphere once at creation, don't recalculate every frame
-  smokeGeo.computeBoundingSphere();
-  return smokes;
-}
+   const smokeGeo = new THREE.BufferGeometry();
+   smokeGeo.setAttribute("position", new THREE.BufferAttribute(sPos, 3));
+   smokeGeo.setAttribute("velocity", new THREE.BufferAttribute(sVel, 3));
+   smokeGeo.setAttribute("lifetime", new THREE.BufferAttribute(sLife, 1));
+
+   const smokeMat = new THREE.PointsMaterial({
+     color: 0x999999,
+     size: PARTICLES.PARTICLE_SCALE * 2.2,
+     transparent: true,
+     opacity: 0.45,
+     depthWrite: false,
+     fog: false,
+   });
+
+   const smokes = new THREE.Points(smokeGeo, smokeMat);
+   smokes.visible = true;
+   smokes.frustumCulled = false;
+   smokeGeo.computeBoundingSphere();
+   return smokes;
+  }
 
 export function animateParticles(
   delta: number,
@@ -122,13 +119,13 @@ export function animateParticles(
   const totalChaos = (speedChaos + altitudeChaos) * (0.8 + thrustFactor * 0.4);
   const altitudeFactor = Math.max(0.5, 1 - ry / 1000);
 
-  // Fixed: rotation.x is left/right tilt, rotation.z is forward/back tilt
-  // Base thrust direction: always pointing down/backward when level
+
+
   let thrustDirX = Math.sin(rocketRotation.x);
   let thrustDirY = -Math.cos(rocketRotation.z);
   let thrustDirZ = Math.sin(rocketRotation.z);
   
-  // Normalize direction
+
   const thrustLen = Math.sqrt(thrustDirX * thrustDirX + thrustDirY * thrustDirY + thrustDirZ * thrustDirZ);
   if (thrustLen > 0) {
     thrustDirX /= thrustLen;
@@ -136,7 +133,7 @@ export function animateParticles(
     thrustDirZ /= thrustLen;
   }
 
-  // Use deterministic hash for particle randomness to reduce Math.random() calls
+
   const hash = (i: number, seed: number) => {
     const x = Math.sin(i * 73.156 + seed * 12.989) * 43758.5453;
     return x - Math.floor(x);
@@ -162,7 +159,7 @@ export function animateParticles(
     flameVel[i * 3 + 2] *= 0.97;
     flameVel[i * 3 + 1] *= 0.94;
 
-    // Color transition: yellow -> orange -> red as particle ages
+
     const colorPhase = lifeRatio;
     if (colorPhase < 0.4) {
       flameColor[i * 3] = 1.0;
@@ -189,7 +186,7 @@ export function animateParticles(
       const velHash2 = hash(i, 50.0);
       const velHash3 = hash(i, 60.0);
 
-      // Apply spread perpendicular to thrust direction (opposite to tilt direction)
+
       const perpX = -thrustDirZ;
       const perpZ = thrustDirX;
       
@@ -235,7 +232,7 @@ export function animateParticles(
       const sVelHash2 = hash(i + 200, 50.0);
       const sVelHash3 = hash(i + 200, 60.0);
 
-      // Apply dispersion perpendicular to thrust direction (opposite to tilt direction)
+
       const sPerpX = -thrustDirZ;
       const sPerpZ = thrustDirX;
 
@@ -254,11 +251,11 @@ export function animateParticles(
   flameRef.geometry.attributes.position.needsUpdate = true;
   flameRef.geometry.attributes.lifetime.needsUpdate = true;
   flameRef.geometry.attributes.color.needsUpdate = true;
-  // Don't call computeBoundingSphere() every frame - geometry size doesn't change
+
 
   smokeRef.geometry.attributes.position.needsUpdate = true;
   smokeRef.geometry.attributes.lifetime.needsUpdate = true;
-  // Don't call computeBoundingSphere() every frame - geometry size doesn't change
+
 
   const flameMat = flameRef.material as THREE.PointsMaterial;
   const smokeMat = smokeRef.material as THREE.PointsMaterial;
@@ -267,7 +264,7 @@ export function animateParticles(
     flameMat.size = particleScale * (2.5 + thrustFactor * 3.0 + totalChaos * 1.2);
     smokeMat.size = particleScale * (2.0 + thrustFactor * 2.5 + totalChaos * 0.8);
 
-    // Opacity: brighter with more thrust
+
     flameMat.opacity = Math.max(0.8, Math.min(1, 0.9 + thrustFactor * 0.1));
 
     const smokeOpacity = Math.max(0.3, Math.min(0.9, 0.4 + thrustFactor * 0.4 + totalChaos * 0.2)) * altitudeFactor;

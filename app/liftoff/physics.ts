@@ -22,38 +22,38 @@ export function calculateAcceleration(params: PhysicsParams): number {
 
 
 export function updatePhysics(
-  velocity: number,
-  acceleration: number,
-  yPosition: number,
-  delta: number,
-  fuelConsumption: number,
-  thrustActive: boolean,
-  fuel: number
+   velocity: number,
+   acceleration: number,
+   yPosition: number,
+   delta: number,
+   fuelConsumption: number,
+   thrustActive: boolean,
+   fuel: number
 ): {
-  newVelocity: number;
-  newYPosition: number;
-  newFuel: number;
-} {
-  let effectiveAcceleration = acceleration;
-  if (yPosition <= GROUND_LEVEL && !thrustActive) {
-    effectiveAcceleration = 0; // Normal force cancels gravity
-  }
+   newVelocity: number;
+   newYPosition: number;
+   newFuel: number;
+ } {
+   let effectiveAcceleration = acceleration;
+   if (yPosition <= GROUND_LEVEL && !thrustActive) {
+     effectiveAcceleration = 0;
+   }
 
-  let newVelocity = velocity + effectiveAcceleration * delta * 60;
-  let newYPosition = yPosition + newVelocity * delta * 60;
-  let newFuel = fuel;
+   let newVelocity = velocity + effectiveAcceleration * delta * 60;
+   let newYPosition = yPosition + newVelocity * delta * 60;
+   let newFuel = fuel;
 
-  if (newYPosition <= GROUND_LEVEL) {
-    newYPosition = GROUND_LEVEL;
-    newVelocity = Math.max(0, newVelocity); // Only allow upward/zero velocity
-  }
+   if (newYPosition <= GROUND_LEVEL) {
+     newYPosition = GROUND_LEVEL;
+     newVelocity = Math.max(0, newVelocity);
+   }
 
-  if (thrustActive && fuel > 0) {
-    newFuel = Math.max(0, fuel - fuelConsumption * delta * 2);
-  }
+   if (thrustActive && fuel > 0) {
+     newFuel = Math.max(0, fuel - fuelConsumption * delta * 2);
+   }
 
-  return { newVelocity, newYPosition, newFuel };
-}
+   return { newVelocity, newYPosition, newFuel };
+ }
 
 export function calculateThrust(thrustActive: boolean, thrustPower: number, fuel: number): number {
   if (!thrustActive || fuel <= 0) return 0;

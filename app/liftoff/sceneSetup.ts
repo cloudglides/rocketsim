@@ -18,8 +18,7 @@ export function setupCamera(width: number, height: number, povOffset: number) {
 
 export function setupRenderer(container: HTMLDivElement): THREE.WebGLRenderer | any {
    let renderer: THREE.WebGLRenderer | any;
-   
-   // Try WebGPU first if available
+
    if ((navigator as any).gpu) {
      try {
        renderer = createWebGPURenderer();
@@ -31,7 +30,7 @@ export function setupRenderer(container: HTMLDivElement): THREE.WebGLRenderer | 
    } else {
      renderer = createWebGLRenderer();
    }
-   
+
    renderer.setSize(window.innerWidth, window.innerHeight);
    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
    renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -40,7 +39,7 @@ export function setupRenderer(container: HTMLDivElement): THREE.WebGLRenderer | 
 }
 
 function createWebGLRenderer(): THREE.WebGLRenderer {
-   return new THREE.WebGLRenderer({ 
+   return new THREE.WebGLRenderer({
      antialias: true,
      powerPreference: 'high-performance',
      preserveDrawingBuffer: false,
@@ -49,29 +48,23 @@ function createWebGLRenderer(): THREE.WebGLRenderer {
 }
 
 async function createWebGPURenderer(): Promise<any> {
-   // WebGPU renderer using THREE.WebGPURenderer (experimental)
-   // This requires @react-three/fiber or manual implementation
-   // For now, we use a polyfill approach with WebGL as WebGPU isn't fully stable in Three.js
-   
    try {
      const adapter = await (navigator as any).gpu?.requestAdapter();
      if (!adapter) throw new Error("No WebGPU adapter found");
-     
+
      const device = await adapter.requestDevice();
      console.log("WebGPU device created successfully");
-     
-     // Return enhanced WebGL renderer with WebGPU hints
+
      const renderer = new THREE.WebGLRenderer({
        antialias: true,
        powerPreference: 'high-performance',
        preserveDrawingBuffer: false,
        alpha: false
      });
-     
-     // Attach WebGPU context for future use
+
      (renderer as any).webgpuDevice = device;
      (renderer as any).webgpuAdapter = adapter;
-     
+
      return renderer;
    } catch (e) {
      console.error("WebGPU setup failed:", e);

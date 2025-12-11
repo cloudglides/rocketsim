@@ -18,26 +18,26 @@ export function OrbitScreen({ altitude, speed, onContinue }: OrbitScreenProps) {
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    // Setup scene
+
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x000011);
     sceneRef.current = scene;
 
-    // Setup camera - isometric/2D view
+
     const camera = new THREE.OrthographicCamera(
       -150, 150, 150, -150, 0.1, 1000
     );
     camera.position.z = 200;
     cameraRef.current = camera;
 
-    // Setup renderer
+
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(canvasRef.current.clientWidth, canvasRef.current.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     canvasRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // Add stars background
+
     const starCount = 500;
     const starGeometry = new THREE.BufferGeometry();
     const starPositions = new Float32Array(starCount * 3);
@@ -51,7 +51,7 @@ export function OrbitScreen({ altitude, speed, onContinue }: OrbitScreenProps) {
     const stars = new THREE.Points(starGeometry, starMaterial);
     scene.add(stars);
 
-    // Create Earth (large circle)
+
     const earthGeometry = new THREE.CircleGeometry(50, 64);
     const earthMaterial = new THREE.MeshBasicMaterial({
       color: 0x333333,
@@ -60,7 +60,7 @@ export function OrbitScreen({ altitude, speed, onContinue }: OrbitScreenProps) {
     earth.position.z = -10;
     scene.add(earth);
 
-    // Add grid pattern to Earth
+
     const earthGridCanvas = document.createElement('canvas');
     earthGridCanvas.width = 256;
     earthGridCanvas.height = 256;
@@ -75,7 +75,7 @@ export function OrbitScreen({ altitude, speed, onContinue }: OrbitScreenProps) {
       ctx.stroke();
     }
     
-    // Add glow ring around Earth
+
     const glowGeometry = new THREE.BufferGeometry();
     const glowPositions = new Float32Array(65 * 3);
     for (let i = 0; i < 64; i++) {
@@ -92,7 +92,7 @@ export function OrbitScreen({ altitude, speed, onContinue }: OrbitScreenProps) {
     const glowLine = new THREE.Line(glowGeometry, glowMaterial);
     scene.add(glowLine);
 
-    // Create orbit path (circle)
+
     const orbitGeometry = new THREE.BufferGeometry();
     const orbitRadius = 80;
     const orbitPositions = new Float32Array(65 * 3);
@@ -110,7 +110,7 @@ export function OrbitScreen({ altitude, speed, onContinue }: OrbitScreenProps) {
     const orbitLine = new THREE.Line(orbitGeometry, orbitMaterial);
     scene.add(orbitLine);
 
-    // Create rocket (small triangle)
+
     const rocketGeometry = new THREE.BufferGeometry();
     const rocketVertices = new Float32Array([
       0, 3, 0,
@@ -124,7 +124,7 @@ export function OrbitScreen({ altitude, speed, onContinue }: OrbitScreenProps) {
     rocketRef.current = rocket;
     scene.add(rocket);
 
-    // Add rocket outline
+
     const rocketOutlineGeometry = new THREE.BufferGeometry();
     rocketOutlineGeometry.setAttribute('position', new THREE.BufferAttribute(rocketVertices, 3));
     rocketOutlineGeometry.setIndex([0, 1, 1, 2, 2, 0]);
@@ -133,14 +133,14 @@ export function OrbitScreen({ altitude, speed, onContinue }: OrbitScreenProps) {
     rocketOutline.position.z = -5;
     rocket.add(rocketOutline);
 
-    // Add rocket tracking dot
+
     const dotGeometry = new THREE.CircleGeometry(1, 16);
     const dotMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const dot = new THREE.Mesh(dotGeometry, dotMaterial);
     dot.position.z = -6;
     rocket.add(dot);
 
-    // Animation loop
+
     let animId: number;
     const clock = new THREE.Clock();
 
@@ -155,7 +155,7 @@ export function OrbitScreen({ altitude, speed, onContinue }: OrbitScreenProps) {
         rocketRef.current.position.y = Math.sin(orbitAngleRef.current) * orbitRadius;
         rocketRef.current.position.z = -9;
 
-        // Rotate rocket to face direction of motion
+
         rocketRef.current.rotation.z = orbitAngleRef.current + Math.PI / 2;
       }
 
@@ -166,7 +166,7 @@ export function OrbitScreen({ altitude, speed, onContinue }: OrbitScreenProps) {
 
     animate();
 
-    // Handle resize
+
     const handleResize = () => {
       if (canvasRef.current && rendererRef.current) {
         const width = canvasRef.current.clientWidth;

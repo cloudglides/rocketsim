@@ -40,7 +40,7 @@ export function animateDiamonds(
   const thrustFactor = thrustActive ? Math.min(1, (thrustPower / 0.02) * 1.8) : 0;
   const nozzleY = ry - NOZZLE_OFFSET;
 
-  // Use delta-based timing instead of Date.now()
+
   diamondTimeAccumulator += delta;
   const time = diamondTimeAccumulator;
 
@@ -55,7 +55,7 @@ export function animateDiamonds(
     const chaosSpacing = spacing * (1 + thrustFactor * 3.5 + totalChaos * 4);
     const y = nozzleY - chaosSpacing;
 
-    // Reduce perturbation variance calculation
+
     const perturbX = Math.sin(time * 2 + i) * totalChaos * 0.8;
     const perturbZ = Math.cos(time * 2 + i) * totalChaos * 0.8;
     ring.position.set(rx + perturbX, y, rz + perturbZ);

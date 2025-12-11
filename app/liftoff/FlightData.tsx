@@ -23,7 +23,7 @@ export function FlightData({
   apogee,
   perigee,
 }: FlightDataProps) {
-  // Color based on conditions
+
   const getGForceColor = () => {
     if (gForce > 6) return '#ff0000';
     if (gForce > 4) return '#ffff00';
@@ -38,7 +38,7 @@ export function FlightData({
   };
 
   const getAtmosphereVisibility = () => {
-    // Atmosphere effectively ends at 100km, so use that as reference
+
     const normalizedAlt = Math.max(0, Math.min(100, altitude)) / 100;
     return 1 - normalizedAlt;
   };

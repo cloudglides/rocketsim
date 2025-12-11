@@ -95,14 +95,13 @@ export default function LiftoffPage() {
     sceneRef.current = scene;
     const camera = setupCamera(window.innerWidth, window.innerHeight, povOffsetRef.current);
     const renderer = setupRenderer(mountRef.current);
-    
-    // Detect renderer backend
+
     if ((renderer as any).webgpuDevice) {
       setRendererBackend('WebGPU');
     } else {
       setRendererBackend('WebGL');
     }
-    
+
     const controls = setupControls(camera, renderer);
     const baseLight = setupLighting(scene);
     const ground = setupGround(scene);
@@ -166,7 +165,6 @@ export default function LiftoffPage() {
       animId = requestAnimationFrame(animate);
       const delta = Math.min(clock.getDelta(), 0.05);
 
-      // Update celebration and milestone timers normally (they're part of game logic)
       if (orbitCelebrationTime > 0) {
         setOrbitCelebrationTime(prev => Math.max(0, prev - delta));
       }
@@ -210,14 +208,12 @@ export default function LiftoffPage() {
           bgColorsRef.current.transition.setHex(color);
           sceneRef.current.background = bgColorsRef.current.transition;
           sceneRef.current.fog = null;
-          // Fade in stars as we approach 500km
           starsRef.current.stars.visible = true;
           starsRef.current.nebula.visible = true;
           const starFadeRatio = ratio;
           (starsRef.current.stars.material as THREE.PointsMaterial).opacity = starFadeRatio * 0.3;
           (starsRef.current.nebula.material as THREE.PointsMaterial).opacity = starFadeRatio * 0.15;
         } else {
-          // At 500km+ show space with stars at full brightness
           sceneRef.current.background = bgColorsRef.current.space;
           sceneRef.current.fog = null;
           starsRef.current.stars.visible = true;
@@ -261,14 +257,12 @@ export default function LiftoffPage() {
         const rotationDamping = 0.68;
         const maxRotation = Math.PI / 1.8;
 
-        // Left/Right moves left/right
         if (keysPressed.current['ArrowLeft']) {
           rocket.rotation.x -= rotationSpeed;
         }
         if (keysPressed.current['ArrowRight']) {
           rocket.rotation.x += rotationSpeed;
         }
-        // Up/Down moves forward/back
         if (keysPressed.current['ArrowUp']) {
           rocket.rotation.z += rotationSpeed;
         }
@@ -283,18 +277,14 @@ export default function LiftoffPage() {
           rocket.rotation.z *= rotationDamping;
         }
 
-        // Aggressive rotation limits
         rocket.rotation.x = Math.max(-maxRotation, Math.min(maxRotation, rocket.rotation.x));
         rocket.rotation.z = Math.max(-maxRotation, Math.min(maxRotation, rocket.rotation.z));
         rocket.rotation.y = 0;
 
-        // Fixed: rotation.x is left/right tilt, rotation.z is forward/back tilt
-        // Base thrust direction: always pointing down/backward when level
         let thrustDirectionX = Math.sin(rocket.rotation.x);
         let thrustDirectionY = -Math.cos(rocket.rotation.z);
         let thrustDirectionZ = Math.sin(rocket.rotation.z);
-        
-        // Normalize direction
+
         const thrustLen = Math.sqrt(thrustDirectionX * thrustDirectionX + thrustDirectionY * thrustDirectionY + thrustDirectionZ * thrustDirectionZ);
         if (thrustLen > 0) {
           thrustDirectionX /= thrustLen;
@@ -310,17 +300,14 @@ export default function LiftoffPage() {
         const spaceDrag = 0.95;
         const atmosphericDrag = altitudeKm < 100 ? heavyDrag : spaceDrag;
 
-        // Apply drag coefficient to lateral velocities (drag creates resistance)
         const dragDamping = Math.max(0.3, 1 - dragCoefficientRef.current * 100);
         lateralVelocityXRef.current *= atmosphericDrag * dragDamping;
         lateralVelocityZRef.current *= atmosphericDrag * dragDamping;
-        
-        // Clamp lateral velocity to prevent overshoot
+
         const maxLateralVel = 15;
         lateralVelocityXRef.current = Math.max(-maxLateralVel, Math.min(maxLateralVel, lateralVelocityXRef.current));
         lateralVelocityZRef.current = Math.max(-maxLateralVel, Math.min(maxLateralVel, lateralVelocityZRef.current));
 
-        // Ultra-responsive arcade controls
         lateralVelocityXRef.current += thrustDirectionX * thrustMagnitude * delta * 200;
         lateralVelocityZRef.current += thrustDirectionZ * thrustMagnitude * delta * 200;
         velocityRef.current += (-thrustDirectionY * thrustMagnitude - altitudeGravity * 1.2) * delta * 85;
@@ -328,18 +315,15 @@ export default function LiftoffPage() {
         rocket.position.x += lateralVelocityXRef.current * delta * 60;
         rocket.position.z += lateralVelocityZRef.current * delta * 60;
         rocket.position.y += velocityRef.current * delta * 60;
-        
-        // Enforce ground constraint: prevent sinking below ground
+
         if (rocket.position.y <= GROUND_LEVEL) {
           rocket.position.y = GROUND_LEVEL;
-          // Only allow upward velocity when grounded
           if (velocityRef.current < 0) {
             velocityRef.current = 0;
           }
         }
 
         const newAltitude = Math.round(Math.max(0, rocket.position.y - GROUND_LEVEL) * 10) / 10;
-        // Calculate total velocity (combination of all velocity components)
         const totalVelocityMagnitude = Math.sqrt(
           velocityRef.current * velocityRef.current +
           lateralVelocityXRef.current * lateralVelocityXRef.current +
@@ -348,7 +332,6 @@ export default function LiftoffPage() {
         const newSpeed = Math.round(Math.abs(totalVelocityMagnitude) * 1000) / 10;
         const newFuelPercent = Math.round(fuelRef.current * 10) / 10;
 
-        // Throttle HUD updates to avoid re-renders every frame
         lastHUDUpdateRef.current += delta;
         if (lastHUDUpdateRef.current >= HUD_UPDATE_INTERVAL) {
           setAltitude(newAltitude);
@@ -365,10 +348,9 @@ export default function LiftoffPage() {
           console.log(`Alt: ${newAltitudeKm.toFixed(1)}km (need ${ORBITAL_ALTITUDE}), Speed: ${speedKmS.toFixed(2)}km/s (need ${(ORBITAL_VELOCITY * 0.9).toFixed(2)}), inOrbit: ${inOrbitNow}`);
         }
 
-        // Calculate dynamic crash threshold based on drag coefficient
         const dragScaleFactor = Math.max(0.5, 1 - dragCoefficientRef.current * 5000);
         const crashThreshold = MAX_SPEED_KMS * dragScaleFactor;
-        
+
         if (speedKmS > crashThreshold && !rocketCrashedRef.current) {
           rocketCrashedRef.current = true;
           crashMessageRef.current = 'BOOM';
@@ -406,7 +388,6 @@ export default function LiftoffPage() {
         celebrationShake = Math.sin(orbitCelebrationTime * 8) * (progress > 0.5 ? (1 - progress) * 0.3 : progress * 0.3);
       }
 
-      // Speed-based drag shaking
       let dragShake = 0;
       if (rocketRef.current && !rocketCrashedRef.current) {
         const totalVelMag = Math.sqrt(
@@ -415,13 +396,11 @@ export default function LiftoffPage() {
           lateralVelocityZRef.current * lateralVelocityZRef.current
         );
         const speedKmS = (Math.round(Math.abs(totalVelMag) * 1000) / 10) / 1000;
-        
-        // Calculate dynamic speed limit based on drag coefficient (higher drag = lower limit)
+
         const dragScaleFactor = Math.max(0.5, 1 - dragCoefficientRef.current * 5000);
         const dynamicSpeedLimit = MAX_SPEED_KMS * dragScaleFactor;
-        
+
         if (speedKmS > SPEED_SHAKE_THRESHOLD) {
-          // Exponential shake intensity based on proximity to crash threshold
           const excessSpeed = speedKmS - SPEED_SHAKE_THRESHOLD;
           const speedRangeToLimit = dynamicSpeedLimit - SPEED_SHAKE_THRESHOLD;
           const shakeIntensity = Math.pow(Math.max(0, excessSpeed / speedRangeToLimit), 1.5);
@@ -429,14 +408,12 @@ export default function LiftoffPage() {
         }
       }
 
-      // Camera shake from thrust or after launch
       const thrustShake = (thrustActiveRef.current && fuelRef.current > 0 ? 0.15 : 0);
       const launchShake = hasLaunchedRef.current && fuelRef.current > 0 ? 0.08 : 0;
       const shakeIntensity = thrustShake + launchShake + celebrationShake + Math.abs(dragShake);
       cameraShakeRef.current.targetIntensity = shakeIntensity;
       cameraShakeRef.current.intensity += (cameraShakeRef.current.targetIntensity - cameraShakeRef.current.intensity) * 0.15;
 
-      // Use perlin-like shake using sine waves to reduce Math.random() calls
       const shakeTime = performance.now() * 0.003;
       const shakeX = Math.sin(shakeTime) * cameraShakeRef.current.intensity;
       const shakeY = Math.sin(shakeTime + 1.5) * cameraShakeRef.current.intensity;
@@ -464,7 +441,6 @@ export default function LiftoffPage() {
 
       if (rocketRef.current) {
         baseLight.position.set(rocketRef.current.position.x, rocketRef.current.position.y - 6, rocketRef.current.position.z);
-        // Use sine wave for flicker instead of Math.random()
         const flicker = thrustActiveRef.current ? Math.sin(performance.now() * 0.005) * 0.6 + 1.5 : 0.03;
         baseLight.intensity = flicker;
       }
@@ -474,14 +450,12 @@ export default function LiftoffPage() {
         animateParticles(delta, flameRef.current, smokeRef.current, rocketRef.current.position, velocityRef.current, particleScaleRef.current, thrustActiveRef.current, currentAltitude, thrustPowerRef.current, PARTICLE_SPAWN_Y_OFFSET, { x: rocketRef.current.rotation.x, z: rocketRef.current.rotation.z });
       }
 
-      // Update rocket trail using circular buffer
       if (trailRef.current && rocketRef.current) {
         const trailGeo = trailRef.current.geometry;
         const positions = trailGeo.attributes.position.array as Float32Array;
         const colors = trailGeo.attributes.color.array as Float32Array;
         const TRAIL_SIZE = 3000;
 
-        // Use circular buffer: write to position, wrap around
         const idx = trailBufferIndexRef.current;
         positions[idx * 3] = rocketRef.current.position.x;
         positions[idx * 3 + 1] = rocketRef.current.position.y;
@@ -490,7 +464,6 @@ export default function LiftoffPage() {
         colors[idx * 3 + 1] = 0.7;
         colors[idx * 3 + 2] = 0.3;
 
-        // Fade out older entries as we go
         const fadeIdx = (idx + 1) % TRAIL_SIZE;
         colors[fadeIdx * 3] *= 0.98;
         colors[fadeIdx * 3 + 1] *= 0.98;
