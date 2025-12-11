@@ -18,6 +18,12 @@ export default function LiftoffPage() {
   const smokeRef = useRef<THREE.Points | null>(null);
   const diamondsRef = useRef<THREE.Mesh[]>([]);
   const sceneInitialized = useRef(false);
+  const starsRef = useRef<{ stars: THREE.Points; nebula: THREE.Points } | null>(null);
+  const spaceContainerRef = useRef<THREE.Group | null>(null);
+  const cameraShakeRef = useRef({ intensity: 0, targetIntensity: 0 });
+  const trailRef = useRef<THREE.Points | null>(null);
+  const trailPositionsRef = useRef<number[]>([]);
+  const trailOpacitiesRef = useRef<number[]>([]);
 
   const velocityRef = useRef(0);
   const fuelRef = useRef(PHYSICS.INITIAL_FUEL);
@@ -41,6 +47,10 @@ export default function LiftoffPage() {
   const [unlimitedFuel, setUnlimitedFuel] = useState(false);
   const [inOrbit, setInOrbit] = useState(false);
   const [gameState, setGameState] = useState<'ready' | 'flying' | 'orbit' | 'crashed'>('ready');
+  const [orbitCelebrationTime, setOrbitCelebrationTime] = useState(0);
+  const [milestone, setMilestone] = useState<{ text: string; time: number } | null>(null);
+  const milestonesReachedRef = useRef(new Set<number>());
+  const hasLaunchedRef = useRef(false);
 
   const [thrustPower, setThrustPower] = useState(PHYSICS.THRUST_POWER);
   const [gravity, setGravity] = useState(PHYSICS.GRAVITY);
@@ -83,15 +93,44 @@ export default function LiftoffPage() {
     const diamonds = createDiamonds(scene);
     diamondsRef.current = diamonds;
 
+    // Create rocket trail
+    const trailGeo = new THREE.BufferGeometry();
+    const trailPositions = new Float32Array(3000 * 3);
+    const trailColors = new Float32Array(3000 * 3);
+    for (let i = 0; i < 3000; i++) {
+      trailPositions[i * 3] = 0;
+      trailPositions[i * 3 + 1] = -1000;
+      trailPositions[i * 3 + 2] = 0;
+      trailColors[i * 3] = 0.8;
+      trailColors[i * 3 + 1] = 0.6;
+      trailColors[i * 3 + 2] = 0.3;
+    }
+    trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+    trailGeo.setAttribute('color', new THREE.BufferAttribute(trailColors, 3));
+    const trailMat = new THREE.PointsMaterial({
+      size: 2,
+      vertexColors: true,
+      transparent: true,
+      sizeAttenuation: true,
+      fog: false,
+    });
+    const trail = new THREE.Points(trailGeo, trailMat);
+    scene.add(trail);
+    trailRef.current = trail;
+
     const stars = createStarfield();
     const nebula = createNebulaBackground();
     const planetGlow = createPlanetGlow();
-    
+
     const spaceContainer = new THREE.Group();
     spaceContainer.add(stars);
     spaceContainer.add(nebula);
     spaceContainer.add(planetGlow);
     scene.add(spaceContainer);
+    spaceContainerRef.current = spaceContainer;
+
+    // Store references for altitude-based visibility
+    starsRef.current = { stars, nebula };
 
     loadRocket(scene, GROUND_LEVEL + ROCKET_SPAWN_Y).then((rocket) => {
       rocketRef.current = rocket;
@@ -104,12 +143,27 @@ export default function LiftoffPage() {
       animId = requestAnimationFrame(animate);
       const delta = Math.min(clock.getDelta(), 0.05);
 
-      if (sceneRef.current) {
-        const altitudeKm = altitude * SCALE_FACTOR;
-         
+      // Update celebration timer
+      if (orbitCelebrationTime > 0) {
+        setOrbitCelebrationTime(prev => Math.max(0, prev - delta));
+      }
+
+      // Update milestone timer
+      if (milestone && milestone.time > 0) {
+        setMilestone(prev => prev ? { ...prev, time: Math.max(0, prev.time - delta) } : null);
+      } else if (milestone && milestone.time <= 0) {
+        setMilestone(null);
+      }
+
+      if (sceneRef.current && starsRef.current && rocketRef.current) {
+        const currentAltitude = Math.max(0, rocketRef.current.position.y - GROUND_LEVEL);
+        const altitudeKm = currentAltitude * SCALE_FACTOR;
+
         if (altitudeKm < 50) {
           sceneRef.current.background = new THREE.Color(0x87ceeb);
           sceneRef.current.fog = new THREE.Fog(0x87ceeb, 50, 200);
+          starsRef.current.stars.visible = false;
+          starsRef.current.nebula.visible = false;
         } else if (altitudeKm < 100) {
           const ratio = (altitudeKm - 50) / 50;
           const r = Math.round(0x87 * (1 - ratio) + 0x0a * ratio);
@@ -118,6 +172,8 @@ export default function LiftoffPage() {
           const color = (r << 16) | (g << 8) | b;
           sceneRef.current.background = new THREE.Color(color);
           sceneRef.current.fog = new THREE.Fog(color, 50, 200);
+          starsRef.current.stars.visible = false;
+          starsRef.current.nebula.visible = false;
         } else if (altitudeKm < 500) {
           const ratio = (altitudeKm - 100) / 400;
           const r = Math.round(0x0a * (1 - ratio) + 0x00 * ratio);
@@ -126,9 +182,22 @@ export default function LiftoffPage() {
           const color = (r << 16) | (g << 8) | b;
           sceneRef.current.background = new THREE.Color(color);
           sceneRef.current.fog = null;
+          // Fade in stars as we approach 500km
+          starsRef.current.stars.visible = true;
+          starsRef.current.nebula.visible = true;
+          const starFadeRatio = ratio;
+          (starsRef.current.stars.material as THREE.PointsMaterial).opacity = starFadeRatio * 0.3;
+          (starsRef.current.nebula.material as THREE.PointsMaterial).opacity = starFadeRatio * 0.15;
         } else {
+          // At 500km+ show space with stars at full brightness
           sceneRef.current.background = new THREE.Color(0x000000);
           sceneRef.current.fog = null;
+          starsRef.current.stars.visible = true;
+          starsRef.current.stars.renderOrder = 100;
+          (starsRef.current.stars.material as THREE.PointsMaterial).opacity = 1.0;
+          starsRef.current.nebula.visible = true;
+          starsRef.current.nebula.renderOrder = 50;
+          (starsRef.current.nebula.material as THREE.PointsMaterial).opacity = 0.5;
         }
       }
 
@@ -160,51 +229,62 @@ export default function LiftoffPage() {
         velocityRef.current = physicsUpdate.newVelocity;
         fuelRef.current = unlimitedFuel ? PHYSICS.INITIAL_FUEL : physicsUpdate.newFuel;
 
-        const rotationSpeed = 0.08;
-        const rotationDamping = 0.93;
-        
+        const rotationSpeed = 0.45;
+        const rotationDamping = 0.68;
+        const maxRotation = Math.PI / 1.8;
+
+        // Left/Right moves left/right
         if (keysPressed.current['ArrowLeft']) {
-          rocket.rotation.z += rotationSpeed;
-        }
-        if (keysPressed.current['ArrowRight']) {
-          rocket.rotation.z -= rotationSpeed;
-        }
-        if (keysPressed.current['ArrowUp']) {
           rocket.rotation.x += rotationSpeed;
         }
-        if (keysPressed.current['ArrowDown']) {
+        if (keysPressed.current['ArrowRight']) {
           rocket.rotation.x -= rotationSpeed;
         }
-        
-        if (!keysPressed.current['ArrowLeft'] && !keysPressed.current['ArrowRight']) {
-          rocket.rotation.z *= rotationDamping;
+        // Up/Down moves forward/back
+        if (keysPressed.current['ArrowUp']) {
+          rocket.rotation.z -= rotationSpeed;
         }
-        if (!keysPressed.current['ArrowUp'] && !keysPressed.current['ArrowDown']) {
+        if (keysPressed.current['ArrowDown']) {
+          rocket.rotation.z += rotationSpeed;
+        }
+
+        if (!keysPressed.current['ArrowLeft'] && !keysPressed.current['ArrowRight']) {
           rocket.rotation.x *= rotationDamping;
         }
-        
-        rocket.rotation.x = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, rocket.rotation.x));
-        rocket.rotation.z = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, rocket.rotation.z));
-        
-        const thrustDirectionX = -Math.sin(rocket.rotation.z);
-        const thrustDirectionY = Math.cos(rocket.rotation.x) * Math.cos(rocket.rotation.z);
-        const thrustDirectionZ = -Math.sin(rocket.rotation.x);
-        
+        if (!keysPressed.current['ArrowUp'] && !keysPressed.current['ArrowDown']) {
+          rocket.rotation.z *= rotationDamping;
+        }
+
+        // Aggressive rotation limits
+        rocket.rotation.x = Math.max(-maxRotation, Math.min(maxRotation, rocket.rotation.x));
+        rocket.rotation.z = Math.max(-maxRotation, Math.min(maxRotation, rocket.rotation.z));
+        rocket.rotation.y = 0;
+
+        const thrustDirectionX = Math.sin(rocket.rotation.z);
+        const thrustDirectionY = -Math.cos(rocket.rotation.z) * Math.cos(rocket.rotation.x);
+        const thrustDirectionZ = Math.sin(rocket.rotation.x);
+
         const currentMass = massRef.current + fuelRef.current * 5;
         const thrustMagnitude = thrust / (currentMass / 1000);
-        
+
         const altitudeKm = currentAltitude * SCALE_FACTOR;
-        const heavyDrag = 0.85;
-        const spaceDrag = 0.99;
+        const heavyDrag = 0.75;
+        const spaceDrag = 0.95;
         const atmosphericDrag = altitudeKm < 100 ? heavyDrag : spaceDrag;
-        
+
         lateralVelocityXRef.current *= atmosphericDrag;
         lateralVelocityZRef.current *= atmosphericDrag;
         
-        lateralVelocityXRef.current += thrustDirectionX * thrustMagnitude * delta * 60;
-        lateralVelocityZRef.current += thrustDirectionZ * thrustMagnitude * delta * 60;
-        velocityRef.current += (thrustDirectionY * thrustMagnitude - altitudeGravity * 2) * delta * 60;
-        
+        // Clamp lateral velocity to prevent overshoot
+        const maxLateralVel = 15;
+        lateralVelocityXRef.current = Math.max(-maxLateralVel, Math.min(maxLateralVel, lateralVelocityXRef.current));
+        lateralVelocityZRef.current = Math.max(-maxLateralVel, Math.min(maxLateralVel, lateralVelocityZRef.current));
+
+        // Ultra-responsive arcade controls
+        lateralVelocityXRef.current += thrustDirectionX * thrustMagnitude * delta * 200;
+        lateralVelocityZRef.current += thrustDirectionZ * thrustMagnitude * delta * 200;
+        velocityRef.current += (-thrustDirectionY * thrustMagnitude - altitudeGravity * 1.2) * delta * 85;
+
         rocket.position.x += lateralVelocityXRef.current * delta * 60;
         rocket.position.z += lateralVelocityZRef.current * delta * 60;
         rocket.position.y += velocityRef.current * delta * 60;
@@ -212,30 +292,72 @@ export default function LiftoffPage() {
         const newAltitude = Math.round(Math.max(0, rocket.position.y - GROUND_LEVEL) * 10) / 10;
         const newSpeed = Math.round(Math.abs(velocityRef.current) * 1000) / 10;
         const newFuelPercent = Math.round(fuelRef.current * 10) / 10;
-        
+
         setAltitude(newAltitude);
         setSpeed(newSpeed);
         setFuelPercent(newFuelPercent);
-        
+
         const newAltitudeKm = newAltitude * SCALE_FACTOR;
         const speedKmS = newSpeed / 1000;
         const inOrbitNow = newAltitudeKm >= ORBITAL_ALTITUDE && speedKmS >= ORBITAL_VELOCITY * 0.9;
-        
+
+        // Track launch
+        if (thrustActiveRef.current && !hasLaunchedRef.current) {
+          hasLaunchedRef.current = true;
+        }
+
+        const milestones = [100, 250, 500];
+        for (const ms of milestones) {
+          if (newAltitudeKm >= ms && !milestonesReachedRef.current.has(ms)) {
+            milestonesReachedRef.current.add(ms);
+            setMilestone({ text: `🚀 ${ms}km REACHED`, time: 2 });
+          }
+        }
+
         if (inOrbitNow && !inOrbit) {
           setInOrbit(true);
           setGameState('orbit');
+          setOrbitCelebrationTime(3); // 3 seconds of celebration
+          setMilestone({ text: '🌌 ORBIT ACHIEVED!', time: 3 });
         }
       }
+
+      let celebrationShake = 0;
+      if (orbitCelebrationTime > 0) {
+        const progress = orbitCelebrationTime / 3;
+        celebrationShake = Math.sin(orbitCelebrationTime * 8) * (progress > 0.5 ? (1 - progress) * 0.3 : progress * 0.3);
+      }
+
+      // Camera shake from thrust or after launch
+      const thrustShake = (thrustActiveRef.current && fuelRef.current > 0 ? 0.15 : 0);
+      const launchShake = hasLaunchedRef.current && fuelRef.current > 0 ? 0.08 : 0;
+      const shakeIntensity = thrustShake + launchShake + celebrationShake;
+      cameraShakeRef.current.targetIntensity = shakeIntensity;
+      cameraShakeRef.current.intensity += (cameraShakeRef.current.targetIntensity - cameraShakeRef.current.intensity) * 0.15;
+
+      const shakeX = (Math.random() - 0.5) * cameraShakeRef.current.intensity;
+      const shakeY = (Math.random() - 0.5) * cameraShakeRef.current.intensity;
+      const shakeZ = (Math.random() - 0.5) * cameraShakeRef.current.intensity;
 
       if (followRocket && rocketRef.current) {
         const ry = rocketRef.current.position.y;
         const targetY = ry + povOffsetRef.current;
 
-        camera.position.y = targetY;
+        camera.position.y = targetY + shakeY;
+        camera.position.z = shakeZ;
         controls.target.y = ry;
+      } else {
+        camera.position.y += shakeY;
+        camera.position.z += shakeZ;
       }
 
+      camera.position.x += shakeX;
+
       controls.update();
+
+      if (spaceContainerRef.current) {
+        spaceContainerRef.current.position.copy(camera.position);
+      }
 
       if (rocketRef.current) {
         baseLight.position.set(rocketRef.current.position.x, rocketRef.current.position.y - 6, rocketRef.current.position.z);
@@ -245,6 +367,34 @@ export default function LiftoffPage() {
       if (flameRef.current && smokeRef.current && rocketRef.current) {
         const currentAltitude = Math.max(0, rocketRef.current.position.y - GROUND_LEVEL - ROCKET_SPAWN_Y);
         animateParticles(delta, flameRef.current, smokeRef.current, rocketRef.current.position, velocityRef.current, particleScaleRef.current, thrustActiveRef.current, currentAltitude, thrustPowerRef.current, PARTICLE_SPAWN_Y_OFFSET, { x: rocketRef.current.rotation.x, z: rocketRef.current.rotation.z });
+      }
+
+      // Update rocket trail
+      if (trailRef.current && rocketRef.current) {
+        const trailGeo = trailRef.current.geometry;
+        const positions = trailGeo.attributes.position.array as Float32Array;
+        const colors = trailGeo.attributes.color.array as Float32Array;
+
+        // Shift positions back and add new position
+        for (let i = 2997; i >= 3; i--) {
+          positions[i * 3] = positions[(i - 3) * 3];
+          positions[i * 3 + 1] = positions[(i - 3) * 3 + 1];
+          positions[i * 3 + 2] = positions[(i - 3) * 3 + 2];
+          colors[i * 3] = colors[(i - 3) * 3] * 0.98;
+          colors[i * 3 + 1] = colors[(i - 3) * 3 + 1] * 0.98;
+          colors[i * 3 + 2] = colors[(i - 3) * 3 + 2] * 0.98;
+        }
+
+        // Add new rocket position
+        positions[0] = rocketRef.current.position.x;
+        positions[1] = rocketRef.current.position.y;
+        positions[2] = rocketRef.current.position.z;
+        colors[0] = 0.9;
+        colors[1] = 0.7;
+        colors[2] = 0.3;
+
+        trailGeo.attributes.position.needsUpdate = true;
+        trailGeo.attributes.color.needsUpdate = true;
       }
 
       renderer.render(scene, camera);
@@ -321,6 +471,9 @@ export default function LiftoffPage() {
     setGameState('ready');
     setPovOffsetY(CAMERA.DEFAULT_POV_OFFSET);
     povOffsetRef.current = CAMERA.DEFAULT_POV_OFFSET;
+    milestonesReachedRef.current.clear();
+    setMilestone(null);
+    hasLaunchedRef.current = false;
   };
 
   return (
@@ -466,84 +619,21 @@ export default function LiftoffPage() {
             />
           </div>
 
-          <div className="config-slider">
-            <div className="config-slider-label">
-              <span>Particle Scale</span>
-              <span>{particleScale.toFixed(2)}</span>
-            </div>
-            <input
-              type="range"
-              min="0.1"
-              max="2"
-              step="0.1"
-              value={particleScale}
-              onChange={e => {
-                setParticleScale(+e.target.value);
-                particleScaleRef.current = +e.target.value;
-              }}
-            />
-          </div>
 
-          <div className="config-slider">
-            <div className="config-slider-label">
-              <span>Camera Height</span>
-              <span>{povOffsetY.toFixed(1)}</span>
-            </div>
-            <input
-              type="range"
-              min="-8"
-              max="30"
-              step="0.5"
-              value={povOffsetY}
-              onChange={e => {
-                const v = +e.target.value;
-                setPovOffsetY(v);
-                povOffsetRef.current = v;
-              }}
-            />
-          </div>
+
         </div>
       </div>
 
-      <div className="telemetry-bottom">
-        <div className="altitude-tape">
-          <div className="altitude-tape-label">ALT</div>
-          <div className="altitude-tape-window">
-            <div className="altitude-tape-scale" style={{ transform: `translateY(${-((altitude * SCALE_FACTOR) / 10) * 15}px)` }}>
-              {Array.from({ length: 200 }).map((_, i) => {
-                const alt = i * 10;
-                const isMajor = i % 5 === 0;
-                return (
-                  <div key={i} className={`altitude-tape-mark ${isMajor ? 'major' : ''}`}>
-                    {isMajor && <span>{alt}</span>}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          <div className="altitude-tape-pointer" />
+      <div className="hud-minimal">
+        <div className="hud-corner-top-left">
+          {(speed / 1000).toFixed(2)} km/s
         </div>
-
-        <div className="metrics-panel">
-          <div className="metric-item">
-            <div className="metric-label">SPEED</div>
-            <div className="metric-value">{(speed / 1000).toFixed(2)} km/s</div>
-          </div>
-          <div className="metric-item">
-            <div className="metric-label">FUEL</div>
-            <div className="metric-value" style={{ color: fuelPercent > 30 ? '#00ff00' : '#ff6600' }}>{fuelPercent.toFixed(0)}%</div>
-          </div>
-          <div className="metric-item">
-            <div className="metric-label">MASS</div>
-            <div className="metric-value">{(mass + fuelPercent * 5).toFixed(0)} kg</div>
-          </div>
+        <div className={`hud-corner-top-right ${fuelPercent > 30 ? 'fuel-good' : 'fuel-low'}`}>
+          {fuelPercent.toFixed(0)}%
         </div>
-
-        {inOrbit && (
-          <div className="orbit-indicator">
-            🚀 ORBIT ACHIEVED!
-          </div>
-        )}
+        <div className="hud-corner-bottom-left">
+          {(altitude * SCALE_FACTOR).toFixed(0)} km
+        </div>
       </div>
 
     </div>

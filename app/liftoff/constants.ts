@@ -1,4 +1,4 @@
-export const GROUND_LEVEL = -5.5;
+export const GROUND_LEVEL = 0;
 export const GROUND_Y = -17;
 export const GROUND_COLOR = 0x8b4513;
 
@@ -12,9 +12,9 @@ export const PHYSICS = {
 };
 
 export const PARTICLES = {
-  FLAME_COUNT: 3000,
-  SMOKE_COUNT: 1200,
-  PARTICLE_SCALE: 0.8,
+  FLAME_COUNT: 5000,
+  SMOKE_COUNT: 1800,
+  PARTICLE_SCALE: 1.0,
 };
 
 export const SCENE = {
@@ -30,7 +30,7 @@ export const CAMERA = {
   FOV: 65,
   NEAR: 0.1,
   FAR: 1000,
-  DEFAULT_POV_OFFSET: 4,
+  DEFAULT_POV_OFFSET: 12,
 };
 
 export const CONTROLS = {

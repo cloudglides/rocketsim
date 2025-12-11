@@ -8,7 +8,7 @@ export function createStarfield(): THREE.Points {
   for (let i = 0; i < starCount; i++) {
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.random() * Math.PI;
-    const radius = 2000;
+    const radius = 5000;
 
     starPositions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
     starPositions[i * 3 + 1] = radius * Math.cos(phi);
@@ -35,8 +35,8 @@ export function createStarfield(): THREE.Points {
   starGeometry.setAttribute("color", new THREE.BufferAttribute(starColors, 3));
 
   const starMaterial = new THREE.PointsMaterial({
-    size: 8,
-    sizeAttenuation: false,
+    size: 15,
+    sizeAttenuation: true,
     vertexColors: true,
     fog: false,
     transparent: false,

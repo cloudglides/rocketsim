@@ -27,6 +27,7 @@ export function createFlames(): THREE.Points {
   flameGeo.setAttribute("velocity", new THREE.BufferAttribute(fVel, 3));
   flameGeo.setAttribute("lifetime", new THREE.BufferAttribute(fLife, 1));
 
+
   const flameMat = new THREE.PointsMaterial({
     size: PARTICLES.PARTICLE_SCALE * 3.5,
     transparent: true,
@@ -137,7 +138,7 @@ export function animateParticles(
     if (flamePos[i * 3 + 1] < nozzleY - 20 || flameLife[i] > 0.8) {
       const spreadRadius = 0.5 + totalChaos * 0.4;
       const thrustOffset = 2 + thrustFactor * 3;
-      
+
       flamePos[i * 3] = rx + thrustDirX * thrustOffset + (Math.random() - 0.5) * spreadRadius;
       flamePos[i * 3 + 1] = ry + thrustDirY * thrustOffset + particleSpawnYOffset + (Math.random() - 0.5) * 0.3;
       flamePos[i * 3 + 2] = rz + thrustDirZ * thrustOffset + (Math.random() - 0.5) * spreadRadius;
@@ -169,7 +170,7 @@ export function animateParticles(
     if (smokeLife[i] > maxLife) {
       const dispersionRadius = 0.5 + totalChaos * 0.3;
       const thrustOffset = 1.5 + thrustFactor * 2.5;
-      
+
       smokePos[i * 3] = rx + thrustDirX * thrustOffset + (Math.random() - 0.5) * dispersionRadius;
       smokePos[i * 3 + 1] = ry + thrustDirY * thrustOffset + particleSpawnYOffset + (Math.random() - 0.5) * 0.2;
       smokePos[i * 3 + 2] = rz + thrustDirZ * thrustOffset + (Math.random() - 0.5) * dispersionRadius;
@@ -194,14 +195,16 @@ export function animateParticles(
   const smokeMat = smokeRef.material as THREE.PointsMaterial;
 
   if (thrustActive) {
-    flameMat.size = particleScale * (2.0 + thrustFactor * 2.5 + totalChaos * 1.0);
-    smokeMat.size = particleScale * (1.5 + thrustFactor * 2.0 + totalChaos * 0.6);
+    flameMat.size = particleScale * (2.5 + thrustFactor * 3.0 + totalChaos * 1.2);
+    smokeMat.size = particleScale * (2.0 + thrustFactor * 2.5 + totalChaos * 0.8);
 
-    const saturation = Math.min(1, 0.85 + thrustFactor * 0.15 + totalChaos * 0.1);
-    const lightness = Math.max(0.45, Math.min(0.7, 0.5 + thrustFactor * 0.15 + speedChaos * 0.08));
-    flameMat.color.setHSL(0.04, saturation, lightness);
+    // More realistic flame: bright yellow/white with orange
+    const saturation = Math.min(1, 0.95 + thrustFactor * 0.05 + totalChaos * 0.1);
+    const lightness = Math.max(0.55, Math.min(0.9, 0.65 + thrustFactor * 0.2 + speedChaos * 0.1));
+    flameMat.color.setHSL(0.08, saturation, lightness);
+    flameMat.opacity = Math.max(0.6, Math.min(1, 0.8 + thrustFactor * 0.2));
 
-    const smokeOpacity = Math.max(0.25, Math.min(0.8, 0.3 + thrustFactor * 0.3 + totalChaos * 0.15)) * altitudeFactor;
+    const smokeOpacity = Math.max(0.3, Math.min(0.9, 0.4 + thrustFactor * 0.4 + totalChaos * 0.2)) * altitudeFactor;
     smokeMat.opacity = smokeOpacity;
   } else {
     flameMat.size = particleScale * 0.5;

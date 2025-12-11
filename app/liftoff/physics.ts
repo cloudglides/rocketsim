@@ -20,6 +20,7 @@ export function calculateAcceleration(params: PhysicsParams): number {
   return (params.thrust - params.gravity - params.dragCoefficient * params.velocity * Math.abs(params.velocity)) / (curMass / 1000);
 }
 
+
 export function updatePhysics(
   velocity: number,
   acceleration: number,
