@@ -28,7 +28,7 @@ input[type="range"] {
   width: 100%;
   height: 6px;
   border-radius: 3px;
-  background: linear-gradient(to right, #1e293b, #334155);
+  background: linear-gradient(to right, #333, #555);
   outline: none;
 }
 
@@ -38,15 +38,15 @@ input[type="range"]::-webkit-slider-thumb {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #ffffff);
+  background: #ffffff;
   cursor: pointer;
-  box-shadow: 0 0 12px rgba(6, 182, 212, 0.8), inset 0 0 4px rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
   transition: all 0.2s ease;
 }
 
 input[type="range"]::-webkit-slider-thumb:active {
   transform: scale(1.2);
-  box-shadow: 0 0 20px rgba(6, 182, 212, 1);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
 }
 
 input[type="range"]::-moz-range-thumb {
@@ -54,14 +54,15 @@ input[type="range"]::-moz-range-thumb {
   height: 14px;
   border-radius: 50%;
   cursor: pointer;
+  background: #ffffff;
   border: none;
-  box-shadow: 0 0 12px rgba(6, 182, 212, 0.8), inset 0 0 4px rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
   transition: all 0.2s ease;
 }
 
 input[type="range"]::-moz-range-thumb:active {
   transform: scale(1.2);
-  box-shadow: 0 0 20px rgba(6, 182, 212, 1);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
 }
 
 input[type="range"]::-moz-range-track {
@@ -92,15 +93,14 @@ label:hover {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(6, 182, 212, 0.4);
+  background: rgba(255, 255, 255, 0.3);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(6, 182, 212, 0.7);
+  background: rgba(255, 255, 255, 0.5);
 }
 
-/* Minimal HUD */
 .hud-minimal {
   position: absolute;
   width: 100%;
@@ -114,17 +114,26 @@ label:hover {
   position: absolute;
   top: 20px;
   left: 20px;
-  font-size: 14px;
+  font-size: 13px;
   color: #ffffff;
-  font-weight: 400;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  border-left: 2px solid #ffffff;
+  padding-left: 10px;
+  line-height: 1.4;
 }
 
 .hud-corner-top-right {
   position: absolute;
   top: 20px;
   right: 20px;
-  font-size: 14px;
-  font-weight: 400;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  border-right: 2px solid #ffffff;
+  padding-right: 10px;
+  text-align: right;
+  line-height: 1.4;
 }
 
 .hud-corner-top-right.fuel-good {
@@ -132,27 +141,67 @@ label:hover {
 }
 
 .hud-corner-top-right.fuel-low {
-  color: red;
+  color: #ffffff;
+  border-right: 2px solid #ffffff;
+  opacity: 0.6;
+  animation: fuel-warning 0.5s infinite;
+}
+
+@keyframes fuel-warning {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .hud-corner-bottom-left {
   position: absolute;
   bottom: 20px;
   left: 20px;
-  font-size: 14px;
+  font-size: 13px;
   color: #ffffff;
-  font-weight: 400;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  border-left: 2px solid #ffffff;
+  padding-left: 10px;
+  line-height: 1.4;
 }
 
+.hud-altitude-meter {
+  position: absolute;
+  bottom: 60px;
+  left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
+  color: #ffffff;
+}
 
+.altitude-bar {
+  width: 120px;
+  height: 40px;
+  border: 2px solid #ffffff;
+  position: relative;
+  background: #000000;
+}
+
+.altitude-fill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: #ffffff;
+  transition: height 0.05s linear;
+}
 
 .controls-box {
   position: absolute;
   bottom: 20px;
   right: 20px;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 8px;
   padding: 12px;
   display: flex;
@@ -168,22 +217,23 @@ label:hover {
 }
 
 .control-btn {
-  padding: 6px 12px;
+  padding: 8px 16px;
   border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .control-btn:hover {
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(255, 255, 255, 0.2);
   color: rgba(255, 255, 255, 1);
+  border-color: rgba(255, 255, 255, 0.6);
 }
 
 .reset-btn {
@@ -200,7 +250,7 @@ label:hover {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: rgba(255, 255, 255, 0.8);
+  color: rgba(255, 255, 255, 0.9);
   cursor: pointer;
   padding: 4px 0;
 }
@@ -213,17 +263,17 @@ label:hover {
 
 .config-box {
   position: absolute;
-  bottom: 20px;
+  top: 20px;
   left: 20px;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 8px;
   padding: 12px;
   max-width: 280px;
-  max-height: 400px;
+  max-height: 80vh;
   overflow-y: auto;
-  z-index: 40;
+  z-index: 41;
 }
 
 .config-title {
@@ -231,10 +281,10 @@ label:hover {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.95);
   margin-bottom: 12px;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .config-section {

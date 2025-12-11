@@ -52,10 +52,9 @@ export function createPlanetGlow(): THREE.Group {
   const group = new THREE.Group();
 
   const earthGeo = new THREE.SphereGeometry(80, 32, 32);
-  const earthMat = new THREE.MeshBasicMaterial({
-    color: 0x1a5f7a,
-    emissive: 0x0d3d5c,
-  });
+   const earthMat = new THREE.MeshBasicMaterial({
+     color: 0x1a5f7a,
+   });
   const earth = new THREE.Mesh(earthGeo, earthMat);
   earth.position.set(200, -600, 150);
 

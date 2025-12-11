@@ -34,13 +34,18 @@ export function updatePhysics(
   newYPosition: number;
   newFuel: number;
 } {
-  let newVelocity = velocity + acceleration * delta * 60;
+  let effectiveAcceleration = acceleration;
+  if (yPosition <= GROUND_LEVEL && !thrustActive) {
+    effectiveAcceleration = 0; // Normal force cancels gravity
+  }
+
+  let newVelocity = velocity + effectiveAcceleration * delta * 60;
   let newYPosition = yPosition + newVelocity * delta * 60;
   let newFuel = fuel;
 
-  if (newYPosition <= GROUND_LEVEL && newVelocity < 0) {
+  if (newYPosition <= GROUND_LEVEL) {
     newYPosition = GROUND_LEVEL;
-    newVelocity = 0;
+    newVelocity = Math.max(0, newVelocity); // Only allow upward/zero velocity
   }
 
   if (thrustActive && fuel > 0) {
