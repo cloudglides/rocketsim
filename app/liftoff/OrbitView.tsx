@@ -1,289 +1,152 @@
 import React, { useEffect, useRef, useState } from 'react';
-import * as THREE from 'three';
 
 interface OrbitViewProps {
   altitude: number;
   speed: number;
 }
 
-interface InfoPanel {
-  type: 'rocket' | 'planet' | null;
-  data: any;
-}
-
 export function OrbitView({ altitude, speed }: OrbitViewProps) {
-  const mountRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
-  const rocketRef = useRef<THREE.Mesh | null>(null);
-  const earthRef = useRef<THREE.Mesh | null>(null);
-  const rocketAngleRef = useRef(0);
-  const clockRef = useRef<THREE.Clock | null>(null);
-  const raycasterRef = useRef(new THREE.Raycaster());
-  const mouseRef = useRef(new THREE.Vector2());
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [timeScale, setTimeScale] = useState(1);
-  const [infoPanel, setInfoPanel] = useState<InfoPanel>({ type: null, data: null });
-  const animIdRef = useRef<number | null>(null);
-  const angularVelRef = useRef(0);
   const [showSolar, setShowSolar] = useState(false);
-  const orbitRadiusRef = useRef(0);
-  const planetsRef = useRef<any[]>([]);
+  const stateRef = useRef({ elapsed: 0, animId: 0 });
 
   useEffect(() => {
-    if (!mountRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000);
-    sceneRef.current = scene;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
 
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
-    
-    if (showSolar) {
-      camera.position.set(0, 200, 150);
-      camera.lookAt(0, 0, 0);
-    } else {
-      camera.position.set(0, 0, 300);
-      camera.lookAt(0, 0, 0);
-    }
-    
-    cameraRef.current = camera;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) return;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    mountRef.current.appendChild(renderer.domElement);
-    rendererRef.current = renderer;
-
-    if (showSolar) {
-      setupSolarSystem(scene, planetsRef);
-    } else {
-      setupEarthOrbit(scene);
-    }
-
-    function setupSolarSystem(scene: THREE.Scene, planetsRef: React.MutableRefObject<any[]>) {
-      const sunGeo = new THREE.CircleGeometry(20, 32);
-      const sunMat = new THREE.MeshBasicMaterial({ color: 0xFDB813 });
-      const sun = new THREE.Mesh(sunGeo, sunMat);
-      sun.position.z = 0;
-      scene.add(sun);
-
-      const planets = [
-        { name: 'Mercury', dist: 60, size: 4, color: 0x8C7853, speed: 0.04 },
-        { name: 'Venus', dist: 100, size: 7, color: 0xFFC649, speed: 0.015 },
-        { name: 'Earth', dist: 150, size: 7, color: 0x4DA6FF, speed: 0.01 },
-        { name: 'Mars', dist: 200, size: 5, color: 0xE27B58, speed: 0.008 },
-      ];
-
-      planets.forEach(pData => {
-        const orbitGeo = new THREE.BufferGeometry();
-        const orbitPts: THREE.Vector3[] = [];
-        for (let i = 0; i <= 128; i++) {
-          const angle = (i / 128) * Math.PI * 2;
-          orbitPts.push(new THREE.Vector3(pData.dist * Math.cos(angle), pData.dist * Math.sin(angle), 0));
-        }
-        orbitGeo.setFromPoints(orbitPts);
-        const orbitMat = new THREE.LineBasicMaterial({ color: 0x333333 });
-        const orbitLine = new THREE.Line(orbitGeo, orbitMat);
-        scene.add(orbitLine);
-
-        const pGeo = new THREE.CircleGeometry(pData.size, 32);
-        const pMat = new THREE.MeshBasicMaterial({ color: pData.color });
-        const planet = new THREE.Mesh(pGeo, pMat);
-        planet.userData = { angle: 0, speed: pData.speed, dist: pData.dist, name: pData.name };
-        scene.add(planet);
-
-        planetsRef.current.push(planet);
-      });
-    }
-
-    function setupEarthOrbit(scene: THREE.Scene) {
-      const earthGeometry = new THREE.CircleGeometry(60, 64);
-      const earthMaterial = new THREE.MeshBasicMaterial({ color: 0x4DA6FF });
-      const earth = new THREE.Mesh(earthGeometry, earthMaterial);
-      earth.position.z = 0;
-      scene.add(earth);
-      earthRef.current = earth;
-
-      const orbitRadius = 180;
-      orbitRadiusRef.current = orbitRadius;
-
-      const orbitGeometry = new THREE.BufferGeometry();
-      const orbitPoints: THREE.Vector3[] = [];
-      for (let i = 0; i <= 256; i++) {
-        const angle = (i / 256) * Math.PI * 2;
-        orbitPoints.push(new THREE.Vector3(
-          orbitRadius * Math.cos(angle),
-          orbitRadius * Math.sin(angle),
-          0
-        ));
-      }
-      orbitGeometry.setFromPoints(orbitPoints);
-      const orbitMaterial = new THREE.LineBasicMaterial({ color: 0x666666 });
-      const orbitLine = new THREE.Line(orbitGeometry, orbitMaterial);
-      scene.add(orbitLine);
-
-      const rocketGeometry = new THREE.BufferGeometry();
-      const rocketVertices = new Float32Array([0, 12, 0, -7, -10, 0, 7, -10, 0]);
-      rocketGeometry.setAttribute('position', new THREE.BufferAttribute(rocketVertices, 3));
-      rocketGeometry.setIndex([0, 1, 2]);
-      const rocketMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
-      const rocket = new THREE.Mesh(rocketGeometry, rocketMaterial);
-      scene.add(rocket);
-      rocketRef.current = rocket;
-
-      const G = 6.674e-11;
-      const earthMass = 5.972e24;
-      const earthRadius = 6.371e6;
-      const altitudeMeters = altitude * 1000;
-      const orbitalRadiusM = earthRadius + altitudeMeters;
-      
-      const orbitalVelocity = Math.sqrt((G * earthMass) / orbitalRadiusM);
-      const orbitalPeriod = (2 * Math.PI * orbitalRadiusM) / orbitalVelocity;
-      const angularVelocity = (2 * Math.PI) / orbitalPeriod;
-      
-      angularVelRef.current = angularVelocity;
-      rocketAngleRef.current = 0;
-    }
-
-    clockRef.current = new THREE.Clock();
+    let lastTime = Date.now();
 
     const animate = () => {
-      animIdRef.current = requestAnimationFrame(animate);
-      
-      if (!clockRef.current) return;
-      const deltaTime = clockRef.current.getDelta();
+      const now = Date.now();
+      const deltaTime = (now - lastTime) / 1000;
+      lastTime = now;
+
+      stateRef.current.elapsed += deltaTime;
+
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const cx = canvas.width / 2;
+      const cy = canvas.height / 2;
 
       if (showSolar) {
-        planetsRef.current.forEach(planet => {
-          planet.userData.angle += planet.userData.speed * deltaTime * timeScale;
-          planet.position.x = planet.userData.dist * Math.cos(planet.userData.angle);
-          planet.position.y = planet.userData.dist * Math.sin(planet.userData.angle);
+        ctx.fillStyle = '#FDB813';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 50, 0, Math.PI * 2);
+        ctx.fill();
+
+        const pData = [
+          { d: 150, s: 15, c: '#8C7853', sp: 0.04 },
+          { d: 280, s: 20, c: '#FFC649', sp: 0.015 },
+          { d: 410, s: 20, c: '#4DA6FF', sp: 0.01 },
+          { d: 540, s: 15, c: '#E27B58', sp: 0.008 },
+        ];
+
+        pData.forEach(p => {
+          const ang = stateRef.current.elapsed * p.sp * timeScale;
+          const px = cx + Math.cos(ang) * p.d;
+          const py = cy + Math.sin(ang) * p.d;
+
+          ctx.strokeStyle = '#444444';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(cx, cy, p.d, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.fillStyle = p.c;
+          ctx.beginPath();
+          ctx.arc(px, py, p.s, 0, Math.PI * 2);
+          ctx.fill();
         });
       } else {
-        rocketAngleRef.current += angularVelRef.current * deltaTime * timeScale;
-        if (rocketAngleRef.current > Math.PI * 2) {
-          rocketAngleRef.current -= Math.PI * 2;
-        }
+        ctx.fillStyle = '#4DA6FF';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 80, 0, Math.PI * 2);
+        ctx.fill();
 
-        const orbitRadius = orbitRadiusRef.current;
-        const rocketX = orbitRadius * Math.cos(rocketAngleRef.current);
-        const rocketY = orbitRadius * Math.sin(rocketAngleRef.current);
+        const orbitR = 240;
+        ctx.strokeStyle = '#666666';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, cy, orbitR, 0, Math.PI * 2);
+        ctx.stroke();
 
-        if (rocketRef.current) {
-          rocketRef.current.position.set(rocketX, rocketY, 0);
-          rocketRef.current.rotation.z = rocketAngleRef.current + Math.PI / 2;
-        }
+        const G = 6.674e-11;
+        const M = 5.972e24;
+        const R = 6.371e6;
+        const alt = altitude * 1000;
+        const r = R + alt;
+        const v = Math.sqrt((G * M) / r);
+        const T = (2 * Math.PI * r) / v;
+        const w = (2 * Math.PI) / T;
+
+        const ang = stateRef.current.elapsed * w * timeScale;
+        const rx = cx + Math.cos(ang) * orbitR;
+        const ry = cy + Math.sin(ang) * orbitR;
+
+        ctx.save();
+        ctx.translate(rx, ry);
+        ctx.rotate(ang + Math.PI / 2);
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.moveTo(0, 15);
+        ctx.lineTo(-9, -12);
+        ctx.lineTo(9, -12);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.restore();
       }
 
-      if (rendererRef.current && sceneRef.current && cameraRef.current) {
-        rendererRef.current.render(sceneRef.current, cameraRef.current);
-      }
+      stateRef.current.animId = requestAnimationFrame(animate);
     };
 
     animate();
 
-    const handleClick = (event: MouseEvent) => {
-      if (!cameraRef.current || !sceneRef.current || showSolar) return;
-
-      const rect = renderer.domElement.getBoundingClientRect();
-      mouseRef.current.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-      mouseRef.current.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-
-      raycasterRef.current.setFromCamera(mouseRef.current, cameraRef.current);
-
-      const objectsToCheck = [earthRef.current, rocketRef.current].filter(obj => obj !== null) as THREE.Mesh[];
-      const intersects = raycasterRef.current.intersectObjects(objectsToCheck);
-
-      if (intersects.length > 0) {
-        const clicked = intersects[0].object;
-
-        if (clicked === earthRef.current) {
-          setInfoPanel({
-            type: 'planet',
-            data: {
-              name: 'Earth',
-              radius: '6,371 km',
-              mass: '5.972 × 10²⁴ kg',
-            }
-          });
-        } else if (clicked === rocketRef.current) {
-          const linearVelocityMs = angularVelRef.current * orbitRadiusRef.current;
-          const linearVelocityKms = linearVelocityMs / 1000;
-          const orbitalPeriodMin = (2 * Math.PI) / angularVelRef.current / 60;
-          
-          setInfoPanel({
-            type: 'rocket',
-            data: {
-              altitude: (altitude * 1).toFixed(0) + ' km',
-              angularVelocity: (angularVelRef.current * 1e7).toFixed(4) + ' rad/s',
-              linearVelocity: linearVelocityKms.toFixed(2) + ' km/s',
-              orbitalPeriod: orbitalPeriodMin.toFixed(1) + ' min',
-            }
-          });
-        }
-      }
-    };
-
-    renderer.domElement.addEventListener('click', handleClick);
-
     const handleResize = () => {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      if (cameraRef.current) {
-        cameraRef.current.aspect = width / height;
-        cameraRef.current.updateProjectionMatrix();
-      }
-      renderer.setSize(width, height);
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
     };
 
     window.addEventListener('resize', handleResize);
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      renderer.domElement.removeEventListener('click', handleClick);
-      if (animIdRef.current) {
-        cancelAnimationFrame(animIdRef.current);
-      }
-      renderer.dispose();
-      if (mountRef.current?.contains(renderer.domElement)) {
-        mountRef.current.removeChild(renderer.domElement);
-      }
+      cancelAnimationFrame(stateRef.current.animId);
     };
-  }, [altitude, timeScale, showSolar]);
+  }, [showSolar, timeScale, altitude]);
 
   return (
     <div className="fixed inset-0 bg-black">
-      <div ref={mountRef} className="absolute inset-0" />
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full block"
+        style={{ display: 'block' }}
+      />
 
-      {infoPanel.type && !showSolar && (
-        <div className="absolute top-8 left-8 bg-black border border-white text-white p-4 font-mono text-sm max-w-sm z-50">
-          <div className="flex justify-between items-center mb-3">
-            <h2 className="text-lg font-bold">
-              {infoPanel.type === 'rocket' ? 'ROCKET' : 'EARTH'}
-            </h2>
-            <button
-              onClick={() => setInfoPanel({ type: null, data: null })}
-              className="text-white hover:text-gray-400"
-            >
-              ✕
-            </button>
-          </div>
-          <div className="space-y-2">
-            {Object.entries(infoPanel.data).map(([key, value]) => (
-              <div key={key} className="flex justify-between">
-                <span className="opacity-70">{key}:</span>
-                <span className="font-bold">{value}</span>
-              </div>
-            ))}
+      <div className="absolute top-20 left-20 z-50 font-mono text-white text-xs border border-white p-4">
+        <div style={{ letterSpacing: '1px', lineHeight: '1.6' }}>
+          <div>ALTITUDE: {(altitude * 0.001).toFixed(0)} KM</div>
+          <div>VELOCITY: {(speed / 1000).toFixed(2)} KM/S</div>
+          <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px solid white' }}>
+            {showSolar ? 'SOLAR VIEW' : 'ORBITAL VIEW'}
           </div>
         </div>
-      )}
+      </div>
 
-      <div className="absolute bottom-8 right-8 flex flex-col gap-3 z-50">
+      <div className="absolute bottom-20 right-20 flex flex-col gap-4 z-50">
         <button
           onClick={() => setShowSolar(!showSolar)}
-          className="px-4 py-2 border-2 border-white text-white font-mono text-sm font-bold hover:bg-white hover:text-black transition-all"
+          className="px-4 py-2 border border-white text-white font-mono text-xs uppercase tracking-widest hover:bg-white hover:text-black transition-all"
+          style={{ letterSpacing: '1px' }}
         >
           {showSolar ? 'BACK' : 'WARP'}
         </button>
@@ -292,11 +155,12 @@ export function OrbitView({ altitude, speed }: OrbitViewProps) {
             <button
               key={scale}
               onClick={() => setTimeScale(scale)}
-              className={`px-4 py-2 border font-mono text-sm font-bold transition-all ${
+              className={`px-3 py-2 font-mono text-xs uppercase transition-all ${
                 timeScale === scale 
-                  ? 'border-white bg-white text-black' 
-                  : 'border-white/50 text-white/50 hover:border-white hover:text-white'
+                  ? 'border border-white bg-white text-black' 
+                  : 'border border-white text-white hover:bg-white hover:text-black'
               }`}
+              style={{ letterSpacing: '1px' }}
             >
               {scale}x
             </button>

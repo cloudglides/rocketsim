@@ -7,9 +7,10 @@ import { createFlames, createSmokes, animateParticles } from "./particles";
 import { createDiamonds, animateDiamonds } from "./diamonds";
 import { calculateAcceleration, updatePhysics, calculateThrust, calculateGravityWithAltitude } from "./physics";
 import { setupPointerControls, setupResizeListener, handlePOVDrag, type POVControlState } from "./controls";
-import { GROUND_LEVEL, PHYSICS, CAMERA, PARTICLES, ROCKET_SPAWN_Y, PARTICLE_SPAWN_Y_OFFSET, ORBITAL_ALTITUDE, ORBITAL_VELOCITY, SCALE_FACTOR, MAX_SPEED_KMS, SPEED_SHAKE_THRESHOLD } from "./constants";
+import { GROUND_LEVEL, PHYSICS, CAMERA, PARTICLES, ROCKET_SPAWN_Y, PARTICLE_SPAWN_Y_OFFSET, ORBITAL_ALTITUDE, ORBITAL_VELOCITY, SCALE_FACTOR, MAX_SPEED_KMS, SPEED_SHAKE_THRESHOLD, MISSIONS } from "./constants";
 import { createStarfield, createPlanetGlow, createNebulaBackground } from "./space";
 import { OrbitView } from "./OrbitView";
+import { OrbitSuccess } from "./OrbitSuccess";
 
 export default function LiftoffPage() {
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -65,6 +66,13 @@ export default function LiftoffPage() {
   const [povOffsetY, setPovOffsetY] = useState(CAMERA.DEFAULT_POV_OFFSET);
 
   const [rendererBackend, setRendererBackend] = useState<'WebGPU' | 'WebGL'>('WebGL');
+  const [showTitle, setShowTitle] = useState(true);
+  const [showMissionSelect, setShowMissionSelect] = useState(false);
+  const [currentMission, setCurrentMission] = useState<string>('BEGINNER');
+  const [maxAltitudeReached, setMaxAltitudeReached] = useState(0);
+  const [missionProgress, setMissionProgress] = useState(0);
+  const [sceneReady, setSceneReady] = useState(false);
+  const windForceRef = useRef(0);
 
   const povControlStateRef = useRef<POVControlState>({ isDragging: false, lastPointerY: 0 });
   const bgColorsRef = useRef({
@@ -87,11 +95,27 @@ export default function LiftoffPage() {
   useEffect(() => { povOffsetRef.current = povOffsetY; }, [povOffsetY]);
 
   useEffect(() => {
-    if (!mountRef.current || sceneInitialized.current) return;
+    if (showTitle) {
+      console.log('Title screen active, skipping scene init');
+      return;
+    }
+
+    if (sceneInitialized.current) {
+      console.log('Scene already initialized, skipping');
+      return;
+    }
+    
+    if (!mountRef.current) {
+      console.log('mountRef.current is still null, cannot initialize');
+      return;
+    }
+    
     sceneInitialized.current = true;
 
+    console.log('Initializing Three.js scene...');
     const scene = setupScene();
     sceneRef.current = scene;
+    console.log('Scene background:', scene.background?.getHexString());
     const camera = setupCamera(window.innerWidth, window.innerHeight, povOffsetRef.current);
     const renderer = setupRenderer(mountRef.current);
 
@@ -155,10 +179,13 @@ export default function LiftoffPage() {
 
     loadRocket(scene, GROUND_LEVEL + ROCKET_SPAWN_Y).then((rocket) => {
       rocketRef.current = rocket;
+      console.log('Rocket loaded, scene ready');
+      setSceneReady(true);
     });
 
     const clock = new THREE.Clock();
     let animId: number;
+    console.log('Scene setup complete, animation loop starting');
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
@@ -318,6 +345,11 @@ export default function LiftoffPage() {
           setAltitude(newAltitude);
           setSpeed(newSpeed);
           setFuelPercent(newFuelPercent);
+          setMaxAltitudeReached(Math.max(maxAltitudeReached, newAltitude * SCALE_FACTOR));
+          const missionDef = Object.values(MISSIONS).find(m => m.name === currentMission);
+          if (missionDef) {
+            setMissionProgress((newAltitude * SCALE_FACTOR / missionDef.target) * 100);
+          }
           lastHUDUpdateRef.current = 0;
         }
 
@@ -484,7 +516,7 @@ export default function LiftoffPage() {
         mountRef.current.removeChild(renderer.domElement);
       }
     };
-  }, []);
+  }, [showTitle, showMissionSelect]);
 
   const handleReset = () => {
     if (rocketRef.current) rocketRef.current.position.set(0, GROUND_LEVEL + ROCKET_SPAWN_Y, 0);
@@ -498,51 +530,145 @@ export default function LiftoffPage() {
     setThrustActive(false);
     setInOrbit(false);
     setGameState('ready');
+    setOrbitMode(false);
     setPovOffsetY(CAMERA.DEFAULT_POV_OFFSET);
     povOffsetRef.current = CAMERA.DEFAULT_POV_OFFSET;
     hasLaunchedRef.current = false;
+    setFadeOut(false);
+    setMissionProgress(0);
   };
+
+  if (showTitle && !showMissionSelect) {
+    const handleContinueClick = () => {
+      console.log('Continue button clicked!');
+      setShowMissionSelect(true);
+    };
+
+    return (
+      <div className="title-screen" style={{ pointerEvents: 'all' }}>
+        <div className="title-content">
+          <div className="title-text">LIFTOFF</div>
+          <div className="title-subtitle">ROCKET SIMULATOR</div>
+          <div style={{ fontSize: '11px', lineHeight: '1.8', marginTop: '32px', maxWidth: '400px', letterSpacing: '0.5px', opacity: 0.8 }}>
+            REACH ORBITAL ALTITUDE (1000 KM) WITH LIMITED FUEL<br/><br/>
+            SPACE = THROTTLE<br/>
+            DRAG TO ADJUST POV<br/>
+            DOUBLE CLICK TO RESET VIEW<br/><br/>
+            MANAGE THRUST, GRAVITY, AND DRAG<br/>
+            IN OPTIONS TO FIND YOUR BALANCE
+          </div>
+        </div>
+        <button 
+          type="button"
+          onClick={handleContinueClick}
+          onMouseDown={handleContinueClick}
+          style={{
+            padding: '12px 28px',
+            border: '1px solid white',
+            background: '#000000',
+            color: '#ffffff',
+            fontSize: '11px',
+            fontWeight: 400,
+            letterSpacing: '1px',
+            textTransform: 'uppercase',
+            cursor: 'pointer',
+            fontFamily: "'Courier New', monospace",
+            marginTop: '16px',
+            position: 'relative',
+            zIndex: 101,
+            pointerEvents: 'auto',
+            outline: 'none',
+            display: 'block'
+          }}
+        >
+          Continue
+        </button>
+      </div>
+    );
+  }
+
+  if (showTitle && showMissionSelect) {
+    const handleMissionSelect = (missionName: string) => {
+      console.log('Mission selected:', missionName);
+      const mission = Object.values(MISSIONS).find(m => m.name === missionName);
+      if (mission) {
+        fuelRef.current = mission.fuel;
+        setFuelPercent(mission.fuel);
+        gravityRef.current = mission.gravity;
+        setGravity(mission.gravity);
+        windForceRef.current = mission.wind;
+      }
+      setCurrentMission(missionName);
+      setShowTitle(false);
+      setShowMissionSelect(false);
+    };
+
+    return (
+      <div className="title-screen" style={{ pointerEvents: 'all' }}>
+        <div className="title-content">
+          <div className="title-text">SELECT MISSION</div>
+          <div style={{ fontSize: '11px', lineHeight: '2.2', marginTop: '32px', letterSpacing: '1px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {Object.values(MISSIONS).map(mission => (
+              <button
+                type="button"
+                key={mission.name}
+                onClick={() => handleMissionSelect(mission.name)}
+                style={{
+                  padding: '16px 32px',
+                  border: '1px solid white',
+                  background: currentMission === mission.name ? '#ffffff' : '#000000',
+                  color: currentMission === mission.name ? '#000000' : '#ffffff',
+                  fontSize: '12px',
+                  fontWeight: 400,
+                  letterSpacing: '1px',
+                  cursor: 'pointer',
+                  fontFamily: "'Courier New', monospace",
+                  transition: 'all 0.15s ease',
+                  position: 'relative',
+                  zIndex: 101,
+                  pointerEvents: 'auto'
+                }}
+              >
+                <div style={{ marginBottom: '8px' }}>{mission.name}</div>
+                <div style={{ fontSize: '10px', opacity: 0.7 }}>{mission.description}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
-      {orbitMode && (
+      <div ref={mountRef} className="absolute inset-0" style={{ zIndex: 10, display: showTitle ? 'none' : 'block' }} />
+      
+      {gameState === 'orbit' && orbitMode ? (
+        <OrbitSuccess
+          altitude={altitude}
+          speed={speed}
+          onReset={handleReset}
+          mission={currentMission}
+        />
+      ) : orbitMode ? (
         <OrbitView
           altitude={altitude}
           speed={speed}
         />
-      )}
-      {!orbitMode && <div ref={mountRef} className="absolute inset-0" />}
+      ) : null}
 
       {!orbitMode && <div className="controls-box">
         <button
           onClick={handleReset}
-          onKeyDown={(e) => e.key === ' ' && e.preventDefault()}
           className="control-btn reset-btn"
+          type="button"
         >
           Reset
         </button>
-
-        <div className="control-row">
-          <label className="engine-label">
-            <input
-              type="checkbox"
-              checked={thrustActive}
-              onChange={e => { setThrustActive(e.target.checked); thrustActiveRef.current = e.target.checked; }}
-              disabled={fuelPercent <= 0}
-            />
-            <span>{fuelPercent <= 0 ? "No Fuel" : thrustActive ? "Firing" : "Engine"}</span>
-          </label>
-        </div>
-
-        <div className="control-row">
-          <label className="follow-label">
-            <input
-              type="checkbox"
-              checked={followRocket}
-              onChange={e => setFollowRocket(e.target.checked)}
-            />
-            <span>{followRocket ? "Follow" : "Free"}</span>
-          </label>
+        <div style={{ fontSize: '9px', opacity: 0.5, marginTop: '12px', letterSpacing: '0.5px', lineHeight: '1.5' }}>
+          SPACE TO THRUST<br/>
+          DRAG TO LOOK<br/>
+          DOUBLE CLICK RESET VIEW
         </div>
       </div>}
 
@@ -658,27 +784,58 @@ export default function LiftoffPage() {
       </div>}
 
       {!orbitMode && <div className="hud-minimal">
+        <div style={{
+          position: 'absolute',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          fontSize: '11px',
+          letterSpacing: '1px',
+          color: '#ffffff',
+          fontFamily: "'Courier New', monospace",
+          textAlign: 'center',
+          borderBottom: '1px solid #ffffff',
+          paddingBottom: '8px'
+        }}>
+          {currentMission} MISSION<br/>
+          <span style={{ fontSize: '10px', opacity: 0.7 }}>PROGRESS: {Math.min(100, missionProgress).toFixed(0)}%</span>
+        </div>
         <div className="hud-corner-top-left">
           V {(speed / 1000).toFixed(2)}<br/>
-          <span style={{fontSize: '11px', opacity: 0.7}}>km/s</span>
-          <div style={{fontSize: '9px', opacity: 0.5, marginTop: '4px'}}>{rendererBackend}</div>
+          KM/S
         </div>
         <div className={`hud-corner-top-right ${fuelPercent > 30 ? 'fuel-good' : 'fuel-low'}`}>
           F {fuelPercent.toFixed(0)}<br/>
-          <span style={{fontSize: '11px', opacity: 0.7}}>%</span>
+          %
         </div>
         <div className="hud-corner-bottom-left">
           A {(altitude * SCALE_FACTOR).toFixed(0)}<br/>
-          <span style={{fontSize: '11px', opacity: 0.7}}>km</span>
+          KM
         </div>
         <div className="hud-altitude-meter">
-          <span style={{fontSize: '10px', letterSpacing: '1px'}}>ALTITUDE</span>
+          <span>ALT</span>
           <div className="altitude-bar">
             <div 
               className="altitude-fill"
               style={{height: `${Math.min(100, (altitude * SCALE_FACTOR) / 1000 * 100)}%`}}
             />
           </div>
+        </div>
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          fontSize: '12px',
+          letterSpacing: '1px',
+          color: '#ffffff',
+          fontFamily: "'Courier New', monospace",
+          pointerEvents: 'none'
+        }}>
+          {altitude * SCALE_FACTOR < 100 && 'ATMOSPHERE'}
+          {altitude * SCALE_FACTOR >= 100 && altitude * SCALE_FACTOR < 500 && 'LEAVING ATMOSPHERE'}
+          {altitude * SCALE_FACTOR >= 500 && altitude * SCALE_FACTOR < 1000 && 'NEAR ORBIT'}
+          {altitude * SCALE_FACTOR >= 1000 && 'ORBITAL INSERTION'}
         </div>
       </div>}
 

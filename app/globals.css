@@ -13,9 +13,9 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: linear-gradient(135deg, #0f172a 0%, #1a1f35 50%, #0f1419 100%);
-  color: #e4e4e7;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", sans-serif;
+  background: #87ceeb;
+  color: #ffffff;
+  font-family: 'Courier New', 'Courier', monospace;
 }
 
 #__next {
@@ -26,43 +26,28 @@ body {
 input[type="range"] {
   -webkit-appearance: none;
   width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: linear-gradient(to right, #333, #555);
+  height: 2px;
+  background: #ffffff;
   outline: none;
+  cursor: pointer;
 }
 
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
+  width: 8px;
+  height: 8px;
   background: #ffffff;
   cursor: pointer;
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
-  transition: all 0.2s ease;
-}
-
-input[type="range"]::-webkit-slider-thumb:active {
-  transform: scale(1.2);
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
+  border: none;
 }
 
 input[type="range"]::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
+  width: 8px;
+  height: 8px;
   cursor: pointer;
   background: #ffffff;
   border: none;
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
-  transition: all 0.2s ease;
-}
-
-input[type="range"]::-moz-range-thumb:active {
-  transform: scale(1.2);
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
 }
 
 input[type="range"]::-moz-range-track {
@@ -72,20 +57,16 @@ input[type="range"]::-moz-range-track {
 
 input[type="checkbox"] {
   cursor: pointer;
+  accent-color: #ffffff;
 }
 
 button,
 label {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-button:hover,
-label:hover {
-  transform: translateY(-1px);
+  transition: all 0.15s ease;
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 2px;
 }
 
 ::-webkit-scrollbar-track {
@@ -93,12 +74,7 @@ label:hover {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: #ffffff;
 }
 
 .hud-minimal {
@@ -114,74 +90,67 @@ label:hover {
   position: absolute;
   top: 20px;
   left: 20px;
-  font-size: 13px;
+  font-size: 11px;
   color: #ffffff;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-  border-left: 2px solid #ffffff;
-  padding-left: 10px;
-  line-height: 1.4;
+  font-weight: 400;
+  letter-spacing: 1px;
+  border-left: 1px solid #ffffff;
+  padding-left: 12px;
+  line-height: 1.6;
 }
 
 .hud-corner-top-right {
   position: absolute;
   top: 20px;
   right: 20px;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-  border-right: 2px solid #ffffff;
-  padding-right: 10px;
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  border-right: 1px solid #ffffff;
+  padding-right: 12px;
   text-align: right;
-  line-height: 1.4;
-}
-
-.hud-corner-top-right.fuel-good {
-  color: #ffffff;
+  line-height: 1.6;
 }
 
 .hud-corner-top-right.fuel-low {
-  color: #ffffff;
-  border-right: 2px solid #ffffff;
-  opacity: 0.6;
-  animation: fuel-warning 0.5s infinite;
+  animation: fuel-warning 0.6s infinite;
 }
 
 @keyframes fuel-warning {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+  50% { opacity: 0.3; }
 }
 
 .hud-corner-bottom-left {
   position: absolute;
   bottom: 20px;
   left: 20px;
-  font-size: 13px;
+  font-size: 11px;
   color: #ffffff;
-  font-weight: 500;
-  letter-spacing: 0.5px;
-  border-left: 2px solid #ffffff;
-  padding-left: 10px;
-  line-height: 1.4;
+  font-weight: 400;
+  letter-spacing: 1px;
+  border-left: 1px solid #ffffff;
+  padding-left: 12px;
+  line-height: 1.6;
 }
 
 .hud-altitude-meter {
   position: absolute;
-  bottom: 60px;
+  bottom: 80px;
   left: 20px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 11px;
+  gap: 6px;
+  font-size: 10px;
   font-weight: 400;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
   color: #ffffff;
 }
 
 .altitude-bar {
-  width: 120px;
-  height: 40px;
-  border: 2px solid #ffffff;
+  width: 100px;
+  height: 50px;
+  border: 1px solid #ffffff;
   position: relative;
   background: #000000;
 }
@@ -199,92 +168,89 @@ label:hover {
   position: absolute;
   bottom: 20px;
   right: 20px;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(10px);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 8px;
-  padding: 12px;
+  border: 1px solid #ffffff;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  z-index: 40;
+  gap: 12px;
+  z-index: 50;
+  background: #000000;
 }
 
 .control-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .control-btn {
-  padding: 8px 16px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 0;
+  font-size: 10px;
+  font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 1px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  color: rgba(255, 255, 255, 0.9);
+  background: #000000;
+  border: 1px solid #ffffff;
+  color: #ffffff;
   cursor: pointer;
-  transition: all 0.2s ease;
+  font-family: 'Courier New', monospace;
 }
 
 .control-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 1);
-  border-color: rgba(255, 255, 255, 0.6);
+  background: #ffffff;
+  color: #000000;
 }
 
 .reset-btn {
   width: 100%;
-  margin-bottom: 4px;
 }
 
 .engine-label,
 .follow-label {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 600;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: rgba(255, 255, 255, 0.9);
+  color: #ffffff;
   cursor: pointer;
-  padding: 4px 0;
+  padding: 2px 0;
 }
 
 .engine-label input,
 .follow-label input {
   cursor: pointer;
-  accent-color: #fff;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #ffffff;
 }
 
 .config-box {
   position: absolute;
   top: 20px;
   left: 20px;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(10px);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 8px;
-  padding: 12px;
+  background: #000000;
+  border: 1px solid #ffffff;
+  padding: 16px;
   max-width: 280px;
   max-height: 80vh;
   overflow-y: auto;
-  z-index: 41;
+  z-index: 50;
+  display: none;
 }
 
 .config-title {
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 400;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: rgba(255, 255, 255, 0.95);
+  color: #ffffff;
   margin-bottom: 12px;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border-bottom: 1px solid #ffffff;
 }
 
 .config-section {
@@ -297,22 +263,23 @@ label:hover {
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 8px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.8);
+  font-size: 10px;
+  color: #ffffff;
 }
 
 .config-item label {
   flex: 1;
-  font-weight: 600;
+  font-weight: 400;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
   cursor: pointer;
 }
 
 .config-item input[type="checkbox"] {
   cursor: pointer;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
+  border: 1px solid #ffffff;
 }
 
 .config-slider {
@@ -325,15 +292,64 @@ label:hover {
 .config-slider-label {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.7);
-  font-weight: 600;
+  font-size: 9px;
+  color: #ffffff;
+  font-weight: 400;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 1px;
 }
 
 .config-slider input[type="range"] {
   width: 100%;
-  height: 4px;
+  height: 2px;
   cursor: pointer;
+}
+
+.title-screen {
+  position: fixed;
+  inset: 0;
+  background: #000000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  font-family: 'Courier New', monospace;
+  gap: 32px;
+  pointer-events: auto;
+}
+
+.title-content {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.title-text {
+  font-size: 32px;
+  font-weight: 400;
+  letter-spacing: 4px;
+  color: #ffffff;
+  text-transform: uppercase;
+}
+
+.title-subtitle {
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  color: #ffffff;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+button {
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+button:focus {
+  outline: none;
 }

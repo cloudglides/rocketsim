@@ -1,11 +1,10 @@
-
 export const PHYSICS = {
-  THRUST_POWER: 0.012,
-  GRAVITY: 0.0025,
-  MASS: 1000,
-  DRAG_COEFFICIENT: 0.0001,
-  FUEL_CONSUMPTION: 0.3,
-  INITIAL_FUEL: 200,
+  THRUST_POWER: 0.015,
+  GRAVITY: 0.0018,
+  MASS: 900,
+  DRAG_COEFFICIENT: 0.00008,
+  FUEL_CONSUMPTION: 0.25,
+  INITIAL_FUEL: 300,
 };
 
 export const PARTICLES = {
@@ -28,6 +27,7 @@ export const CAMERA = {
   NEAR: 0.1,
   FAR: 1000,
   DEFAULT_POV_OFFSET: 25,
+  DISTANCE_Z: 0.3,
 };
 
 export const CONTROLS = {
@@ -70,3 +70,30 @@ export const GRAVITY_TRANSITION_END = 200;
 export const SCALE_FACTOR = 0.1;
 export const MAX_SPEED_KMS = 11.2;
 export const SPEED_SHAKE_THRESHOLD = 8.0;
+
+export const MISSIONS = {
+  BEGINNER: { 
+    name: 'BEGINNER', 
+    target: 100, 
+    description: 'Reach 100 KM (No Wind)', 
+    wind: 0.0,
+    fuel: 300,
+    gravity: 0.0018
+  },
+  INTERMEDIATE: { 
+    name: 'INTERMEDIATE', 
+    target: 500, 
+    description: 'Reach 500 KM (Strong Winds)', 
+    wind: 0.0008,
+    fuel: 280,
+    gravity: 0.0018
+  },
+  ADVANCED: { 
+    name: 'ADVANCED', 
+    target: 1000, 
+    description: 'Reach Orbit (Max Difficulty)', 
+    wind: 0.0012,
+    fuel: 250,
+    gravity: 0.002
+  },
+};
