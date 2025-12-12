@@ -72,6 +72,7 @@ export default function LiftoffPage() {
   const [maxAltitudeReached, setMaxAltitudeReached] = useState(0);
   const [missionProgress, setMissionProgress] = useState(0);
   const [sceneReady, setSceneReady] = useState(false);
+  const [missionCompleted, setMissionCompleted] = useState(false);
   const windForceRef = useRef(0);
 
   const povControlStateRef = useRef<POVControlState>({ isDragging: false, lastPointerY: 0 });
@@ -84,6 +85,8 @@ export default function LiftoffPage() {
   const trailBufferIndexRef = useRef(0);
   const lastHUDUpdateRef = useRef(0);
   const HUD_UPDATE_INTERVAL = 0.05;
+  const lastAltitudeRef = useRef(0);
+  const altitudeStallTimeRef = useRef(0);
   const tiltInputRef = useRef({ x: 0, z: 0 });
   const [tiltDisplay, setTiltDisplay] = useState({ x: 0, z: 0 });
   const [windDisplay, setWindDisplay] = useState({ x: 0, z: 0 });
@@ -110,6 +113,7 @@ export default function LiftoffPage() {
     const nextQuestionTimeRef = useRef(1);
     const [blastMessage, setBlastMessage] = useState('');
     const mathQuestionRef = useRef<{ q: string; answers: number[]; correct: number } | null>(null);
+    const spacePressedRef = useRef(false);
 
   useEffect(() => { thrustActiveRef.current = thrustActive; }, [thrustActive]);
   useEffect(() => { thrustPowerRef.current = thrustPower; }, [thrustPower]);
@@ -439,13 +443,14 @@ export default function LiftoffPage() {
             const progress = (newAltitudeKm / missionDef.target) * 100;
             setMissionProgress(progress);
             
-            if (progress >= 100 && gameState === 'flying') {
-              setInOrbit(true);
-              setGameState('orbit');
+            if (progress >= 100 && !missionCompleted && hasLaunchedRef.current) {
+              setMissionCompleted(true);
               setFadeOut(true);
               setTimeout(() => {
-                setOrbitMode(true);
-              }, 1200);
+                setShowTitle(true);
+                setShowMissionSelect(true);
+                setMissionCompleted(false);
+              }, 3000);
             }
           }
           lastHUDUpdateRef.current = 0;
@@ -492,6 +497,7 @@ export default function LiftoffPage() {
       if (mathQuestionRef.current) {
          questionTimeRef.current = Math.max(0, questionTimeRef.current - delta);
          setQuestionTimeLeft(questionTimeRef.current);
+         altitudeStallTimeRef.current = 0;
          
          if (questionTimeRef.current <= 0) {
            questionTimeRef.current = 0;
@@ -502,8 +508,6 @@ export default function LiftoffPage() {
            velocityRef.current *= 0.3;
            fuelRef.current = Math.max(0, fuelRef.current - 20);
            setFuelPercent(fuelRef.current);
-           setBlastMessage('ROCKET BLASTED');
-           setTimeout(() => setBlastMessage(''), 1500);
            nextQuestionTimeRef.current = Math.random() * 5 + 5;
          }
        } else if (gameState !== 'orbit' && !orbitMode && hasLaunchedRef.current && nextQuestionTimeRef.current > 0) {
@@ -511,6 +515,32 @@ export default function LiftoffPage() {
          if (nextQuestionTimeRef.current <= 0) {
            nextQuestionTimeRef.current = 0;
            generateMathQuestion();
+         }
+       }
+
+       if (rocketRef.current) {
+          const currentAltitudeKmNow = Math.max(0, rocketRef.current.position.y - GROUND_LEVEL) * SCALE_FACTOR;
+          if (currentAltitudeKmNow > lastAltitudeRef.current) {
+            altitudeStallTimeRef.current = 0;
+            lastAltitudeRef.current = currentAltitudeKmNow;
+          } else if (!mathQuestionRef.current && hasLaunchedRef.current) {
+            altitudeStallTimeRef.current += delta;
+            if (altitudeStallTimeRef.current >= 10 && gameState === 'flying') {
+              setBlastMessage('YOU LOST');
+              setTimeout(() => setBlastMessage(''), 1500);
+              setGameState('crashed');
+              thrustActiveRef.current = false;
+              altitudeStallTimeRef.current = 0;
+              setTimeout(() => handleReset(), 3000);
+            }
+          }
+
+         if (currentAltitudeKmNow <= 0 && hasLaunchedRef.current && gameState === 'flying') {
+           setBlastMessage('YOU LOST');
+           setTimeout(() => setBlastMessage(''), 1500);
+           setGameState('crashed');
+           thrustActiveRef.current = false;
+           setTimeout(() => handleReset(), 3000);
          }
        }
 
@@ -617,63 +647,33 @@ export default function LiftoffPage() {
       setFollowRocket(true);
     };
 
-    const generateMathQuestion = () => {
-       let num1, num2, op, correct, wrong1, wrong2;
-       
-       if (currentMissionConfig.difficulty === 1) {
-         num1 = Math.floor(Math.random() * 15) + 1;
-         num2 = Math.floor(Math.random() * 15) + 1;
-         op = '+';
-         correct = num1 + num2;
-         wrong1 = correct + Math.floor(Math.random() * 10) + 1;
-         wrong2 = Math.max(1, correct - Math.floor(Math.random() * 10) - 1);
-       } else if (currentMissionConfig.difficulty === 2) {
-         num1 = Math.floor(Math.random() * 12) + 2;
-         num2 = Math.floor(Math.random() * 12) + 2;
-         op = Math.random() > 0.5 ? '*' : '/';
-         if (op === '*') {
-           correct = num1 * num2;
-           wrong1 = correct + Math.floor(Math.random() * 20) + 2;
-           wrong2 = Math.max(1, correct - Math.floor(Math.random() * 20) - 2);
-         } else {
-           num1 = Math.floor(Math.random() * 100) + 10;
-           num2 = Math.floor(Math.random() * 10) + 2;
-           correct = Math.floor(num1 / num2);
-           wrong1 = correct + Math.floor(Math.random() * 10) + 1;
-           wrong2 = Math.max(0, correct - Math.floor(Math.random() * 10) - 1);
-         }
-       } else {
-         const operations = ['+', '-', '*', '/'];
-         op = operations[Math.floor(Math.random() * operations.length)];
-         num1 = Math.floor(Math.random() * 50) + 10;
-         num2 = Math.floor(Math.random() * 20) + 5;
-         
-         if (op === '+') correct = num1 + num2;
-         else if (op === '-') correct = num1 - num2;
-         else if (op === '*') correct = num1 * num2;
-         else correct = Math.floor(num1 / num2);
-         
-         wrong1 = correct + Math.floor(Math.random() * 50) + 5;
-         wrong2 = Math.max(0, correct - Math.floor(Math.random() * 50) - 5);
-       }
-       
-       const answers = [correct, wrong1, wrong2].sort(() => Math.random() - 0.5);
-       setMathQuestion({
-         q: `${num1} ${op} ${num2}`,
-         answers,
-         correct
-       });
-       questionTimeRef.current = 8;
-       setQuestionTimeLeft(8);
-     };
 
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        e.preventDefault();
-        if (!mathQuestion && gameState !== 'orbit' && !orbitMode) {
-          generateMathQuestion();
-        }
+
+
+
+    const cleanupPointer = setupPointerControls(onPointerDown, onPointerMove, onPointerUp, onDoubleClick, renderer);
+    const cleanupResize = setupResizeListener(camera, renderer);
+
+    return () => {
+      cancelAnimationFrame(animId);
+      cleanupPointer();
+      cleanupResize();
+      renderer.dispose();
+      if (mountRef.current?.contains(renderer.domElement)) {
+        mountRef.current.removeChild(renderer.domElement);
       }
+    };
+  }, [showTitle, showMissionSelect]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+         e.preventDefault();
+         if (!spacePressedRef.current) {
+           spacePressedRef.current = true;
+           generateMathQuestion();
+         }
+       }
       if ((e.key === 'w' || e.key === 'W') && !gameState.includes('crashed')) {
         if (e.shiftKey) {
           if (rocketRef.current && altitude * SCALE_FACTOR > 400 && fuelRef.current > 25) {
@@ -699,57 +699,102 @@ export default function LiftoffPage() {
       }
     };
 
-    const onKeyUp = (e: KeyboardEvent) => {
+    const handleKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'w' || e.key === 'W') tiltInputRef.current.x = 0;
       if (e.key === 's' || e.key === 'S') tiltInputRef.current.x = 0;
       if (e.key === 'a' || e.key === 'A') tiltInputRef.current.z = 0;
       if (e.key === 'd' || e.key === 'D') tiltInputRef.current.z = 0;
     };
 
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-
-    const cleanupPointer = setupPointerControls(onPointerDown, onPointerMove, onPointerUp, onDoubleClick, renderer);
-    const cleanupResize = setupResizeListener(camera, renderer);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
 
     return () => {
-      cancelAnimationFrame(animId);
-      cleanupPointer();
-      cleanupResize();
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-      renderer.dispose();
-      if (mountRef.current?.contains(renderer.domElement)) {
-        mountRef.current.removeChild(renderer.domElement);
-      }
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [showTitle, showMissionSelect]);
+  }, [gameState, altitude, fastForwardActive]);
 
-  const handleReset = () => {
-    if (rocketRef.current) rocketRef.current.position.set(0, GROUND_LEVEL + ROCKET_SPAWN_Y, 0);
-    velocityRef.current = 0;
-    lateralVelocityXRef.current = 0;
-    lateralVelocityZRef.current = 0;
-    fuelRef.current = currentMissionConfig.fuel;
-    setAltitude(0);
-    setSpeed(0);
-    setFuelPercent(currentMissionConfig.fuel);
-    setThrustActive(false);
-    setInOrbit(false);
-    setGameState('ready');
-    setOrbitMode(false);
-    setPovOffsetY(CAMERA.DEFAULT_POV_OFFSET);
-    povOffsetRef.current = CAMERA.DEFAULT_POV_OFFSET;
-    hasLaunchedRef.current = false;
-    setFadeOut(false);
-    setMissionProgress(0);
-    engineTempRef.current = 0;
-    setEngineTemp(0);
-    setEngineStatus('OK');
-    malfunctionRef.current = { active: false, timeLeft: 0 };
-    setMalfunctionAlert('');
-    stageSeparatedRef.current = false;
-    setStageSeparated(false);
+  const generateMathQuestion = () => {
+    let num1, num2, op, correct, wrong1, wrong2;
+    
+    if (currentMissionConfig.difficulty === 1) {
+      num1 = Math.floor(Math.random() * 15) + 1;
+      num2 = Math.floor(Math.random() * 15) + 1;
+      op = '+';
+      correct = num1 + num2;
+      wrong1 = correct + Math.floor(Math.random() * 10) + 1;
+      wrong2 = Math.max(1, correct - Math.floor(Math.random() * 10) - 1);
+    } else if (currentMissionConfig.difficulty === 2) {
+      num1 = Math.floor(Math.random() * 12) + 2;
+      num2 = Math.floor(Math.random() * 12) + 2;
+      op = Math.random() > 0.5 ? '*' : '/';
+      if (op === '*') {
+        correct = num1 * num2;
+        wrong1 = correct + Math.floor(Math.random() * 20) + 2;
+        wrong2 = Math.max(1, correct - Math.floor(Math.random() * 20) - 2);
+      } else {
+        num1 = Math.floor(Math.random() * 100) + 10;
+        num2 = Math.floor(Math.random() * 10) + 2;
+        correct = Math.floor(num1 / num2);
+        wrong1 = correct + Math.floor(Math.random() * 10) + 1;
+        wrong2 = Math.max(0, correct - Math.floor(Math.random() * 10) - 1);
+      }
+    } else {
+      const operations = ['+', '-', '*', '/'];
+      op = operations[Math.floor(Math.random() * operations.length)];
+      num1 = Math.floor(Math.random() * 50) + 10;
+      num2 = Math.floor(Math.random() * 20) + 5;
+      
+      if (op === '+') correct = num1 + num2;
+      else if (op === '-') correct = num1 - num2;
+      else if (op === '*') correct = num1 * num2;
+      else correct = Math.floor(num1 / num2);
+      
+      wrong1 = correct + Math.floor(Math.random() * 50) + 5;
+      wrong2 = Math.max(0, correct - Math.floor(Math.random() * 50) - 5);
+    }
+    
+    const answers = [correct, wrong1, wrong2].sort(() => Math.random() - 0.5);
+    setMathQuestion({
+      q: `${num1} ${op} ${num2}`,
+      answers,
+      correct
+    });
+    questionTimeRef.current = 8;
+    setQuestionTimeLeft(8);
+  };
+
+    const handleReset = () => {
+  if (rocketRef.current) rocketRef.current.position.set(0, GROUND_LEVEL + ROCKET_SPAWN_Y, 0);
+  velocityRef.current = 0;
+  lateralVelocityXRef.current = 0;
+  lateralVelocityZRef.current = 0;
+  fuelRef.current = currentMissionConfig.fuel;
+  setAltitude(0);
+  setSpeed(0);
+  setFuelPercent(currentMissionConfig.fuel);
+  setThrustActive(false);
+  setInOrbit(false);
+  setGameState('ready');
+  setOrbitMode(false);
+  setPovOffsetY(CAMERA.DEFAULT_POV_OFFSET);
+  povOffsetRef.current = CAMERA.DEFAULT_POV_OFFSET;
+  hasLaunchedRef.current = false;
+  setFadeOut(false);
+  setMissionProgress(0);
+  engineTempRef.current = 0;
+  setEngineTemp(0);
+  setEngineStatus('OK');
+  malfunctionRef.current = { active: false, timeLeft: 0 };
+  setMalfunctionAlert('');
+  spacePressedRef.current = false;
+  setBlastMessage('');
+  lastAltitudeRef.current = 0;
+  altitudeStallTimeRef.current = 0;
+  setMissionCompleted(false);
+  stageSeparatedRef.current = false;
+  setStageSeparated(false);
     setOrbitalInsertStatus('');
     tiltInputRef.current = { x: 0, z: 0 };
     setTiltDisplay({ x: 0, z: 0 });
@@ -1254,11 +1299,13 @@ export default function LiftoffPage() {
             transform: 'translate(-50%, -50%)',
             fontSize: '64px',
             fontWeight: 'bold',
-            color: '#ff0000',
+            color: '#ffffff',
             fontFamily: "'Courier New', monospace",
             textAlign: 'center',
             zIndex: 500,
-            textShadow: '0 0 20px #ff0000'
+            background: 'rgba(0, 0, 0, 0.95)',
+            padding: '32px 64px',
+            border: '2px solid #ffffff'
           }}>
             {blastMessage}
           </div>
@@ -1306,23 +1353,63 @@ export default function LiftoffPage() {
          </div>
       </div>}
 
-      {fadeOut && (
+      {missionCompleted && (
         <div style={{
           position: 'fixed',
           inset: 0,
-          backgroundColor: '#000000',
-          animation: 'fadeInToBlack 1.2s ease-in forwards',
-          zIndex: 40,
-          pointerEvents: 'none'
-        }} />
+          background: 'rgba(0, 0, 0, 0.9)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 999,
+          pointerEvents: 'auto'
+        }}>
+          <div style={{
+            fontSize: '72px',
+            fontWeight: 'bold',
+            color: '#ffffff',
+            fontFamily: "'Courier New', monospace",
+            marginBottom: '40px',
+            textAlign: 'center',
+            letterSpacing: '4px',
+            animation: 'pulse 1s infinite'
+          }}>
+            MISSION COMPLETED
+          </div>
+          <div style={{
+            fontSize: '24px',
+            color: '#ffffff',
+            fontFamily: "'Courier New', monospace",
+            textAlign: 'center',
+            letterSpacing: '2px'
+          }}>
+            RETURNING TO MISSION SELECT...
+          </div>
+        </div>
       )}
 
-      <style jsx>{`
-        @keyframes fadeInToBlack {
-          0% { opacity: 0; }
-          100% { opacity: 1; }
-        }
-      `}</style>
+      {fadeOut && (
+         <div style={{
+           position: 'fixed',
+           inset: 0,
+           backgroundColor: '#000000',
+           animation: 'fadeInToBlack 1.2s ease-in forwards',
+           zIndex: 40,
+           pointerEvents: 'none'
+         }} />
+       )}
+
+       <style jsx>{`
+         @keyframes fadeInToBlack {
+           0% { opacity: 0; }
+           100% { opacity: 1; }
+         }
+         @keyframes pulse {
+           0%, 100% { opacity: 1; }
+           50% { opacity: 0.5; }
+         }
+       `}</style>
     </div>
   );
 }
