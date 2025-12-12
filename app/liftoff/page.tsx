@@ -7,7 +7,7 @@ import { createFlames, createSmokes, animateParticles } from "./particles";
 import { createDiamonds, animateDiamonds } from "./diamonds";
 import { calculateAcceleration, updatePhysics, calculateThrust, calculateGravityWithAltitude } from "./physics";
 import { setupPointerControls, setupResizeListener, handlePOVDrag, type POVControlState } from "./controls";
-import { GROUND_LEVEL, PHYSICS, CAMERA, PARTICLES, ROCKET_SPAWN_Y, PARTICLE_SPAWN_Y_OFFSET, ORBITAL_ALTITUDE, ORBITAL_VELOCITY, SCALE_FACTOR, MAX_SPEED_KMS, SPEED_SHAKE_THRESHOLD, MISSIONS } from "./constants";
+import { GROUND_LEVEL, PHYSICS, CAMERA, PARTICLES, ROCKET_SPAWN_Y, PARTICLE_SPAWN_Y_OFFSET, ORBITAL_ALTITUDE, ORBITAL_VELOCITY, SCALE_FACTOR, MAX_SPEED_KMS, SPEED_SHAKE_THRESHOLD, MISSIONS, ORBITAL_INSERT_ALTITUDE_MIN, ORBITAL_INSERT_ALTITUDE_MAX, ORBITAL_INSERT_VELOCITY_MIN, ORBITAL_INSERT_VELOCITY_MAX } from "./constants";
 import { createStarfield, createPlanetGlow, createNebulaBackground } from "./space";
 import { OrbitView } from "./OrbitView";
 import { OrbitSuccess } from "./OrbitSuccess";
@@ -76,7 +76,7 @@ export default function LiftoffPage() {
 
   const povControlStateRef = useRef<POVControlState>({ isDragging: false, lastPointerY: 0 });
   const bgColorsRef = useRef({
-    sky: new THREE.Color(0x87ceeb),
+    sky: new THREE.Color(0xffffff),
     space: new THREE.Color(0x000000),
     transition: new THREE.Color(),
   });
@@ -84,6 +84,30 @@ export default function LiftoffPage() {
   const trailBufferIndexRef = useRef(0);
   const lastHUDUpdateRef = useRef(0);
   const HUD_UPDATE_INTERVAL = 0.05;
+  const tiltInputRef = useRef({ x: 0, z: 0 });
+  const [tiltDisplay, setTiltDisplay] = useState({ x: 0, z: 0 });
+  const [windDisplay, setWindDisplay] = useState({ x: 0, z: 0 });
+  
+  const engineTempRef = useRef(0);
+  const [engineTemp, setEngineTemp] = useState(0);
+  const [engineStatus, setEngineStatus] = useState('OK');
+  const malfunctionRef = useRef({ active: false, timeLeft: 0 });
+  const [malfunctionAlert, setMalfunctionAlert] = useState('');
+  const stageSeparatedRef = useRef(false);
+  const [stageSeparated, setStageSeparated] = useState(false);
+  const windGustRef = useRef(0);
+  const gustTimeRef = useRef(0);
+  const [currentMissionConfig, setCurrentMissionConfig] = useState(Object.values(MISSIONS)[0]);
+  const [orbitalInsertStatus, setOrbitalInsertStatus] = useState('');
+  const [fastForwardActive, setFastForwardActive] = useState(false);
+  const [boostActive, setBoostActive] = useState(false);
+  const [boostFuel, setBoostFuel] = useState(0);
+  const boostFuelRef = useRef(0);
+  const [warpActive, setWarpActive] = useState(false);
+  const [mathQuestion, setMathQuestion] = useState<{ q: string; answers: number[]; correct: number } | null>(null);
+  const [questionTimeLeft, setQuestionTimeLeft] = useState(0);
+  const questionTimeRef = useRef(0);
+  const nextQuestionTimeRef = useRef(0);
 
   useEffect(() => { thrustActiveRef.current = thrustActive; }, [thrustActive]);
   useEffect(() => { thrustPowerRef.current = thrustPower; }, [thrustPower]);
@@ -96,26 +120,21 @@ export default function LiftoffPage() {
 
   useEffect(() => {
     if (showTitle) {
-      console.log('Title screen active, skipping scene init');
       return;
     }
 
     if (sceneInitialized.current) {
-      console.log('Scene already initialized, skipping');
       return;
     }
     
     if (!mountRef.current) {
-      console.log('mountRef.current is still null, cannot initialize');
       return;
     }
     
     sceneInitialized.current = true;
 
-    console.log('Initializing Three.js scene...');
     const scene = setupScene();
     sceneRef.current = scene;
-    console.log('Scene background:', scene.background?.getHexString());
     const camera = setupCamera(window.innerWidth, window.innerHeight, povOffsetRef.current);
     const renderer = setupRenderer(mountRef.current);
 
@@ -147,8 +166,8 @@ export default function LiftoffPage() {
       trailPositions[i * 3] = 0;
       trailPositions[i * 3 + 1] = -1000;
       trailPositions[i * 3 + 2] = 0;
-      trailColors[i * 3] = 0.8;
-      trailColors[i * 3 + 1] = 0.6;
+      trailColors[i * 3] = 0.3;
+      trailColors[i * 3 + 1] = 0.3;
       trailColors[i * 3 + 2] = 0.3;
     }
     trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
@@ -179,17 +198,19 @@ export default function LiftoffPage() {
 
     loadRocket(scene, GROUND_LEVEL + ROCKET_SPAWN_Y).then((rocket) => {
       rocketRef.current = rocket;
-      console.log('Rocket loaded, scene ready');
       setSceneReady(true);
     });
 
     const clock = new THREE.Clock();
     let animId: number;
-    console.log('Scene setup complete, animation loop starting');
 
     const animate = () => {
       animId = requestAnimationFrame(animate);
-      const delta = Math.min(clock.getDelta(), 0.05);
+      let delta = Math.min(clock.getDelta(), 0.05);
+      
+      if (fastForwardActive) {
+        delta *= 2.0;
+      }
 
       if (orbitCelebrationTime > 0) {
         setOrbitCelebrationTime(prev => Math.max(0, prev - delta));
@@ -205,17 +226,17 @@ export default function LiftoffPage() {
 
         if (altitudeKm < 50) {
           sceneRef.current.background = bgColorsRef.current.sky;
-          if (!fogRef.current || fogRef.current.color.getHex() !== 0x87ceeb) {
-            fogRef.current = new THREE.Fog(0x87ceeb, 50, 200);
+          if (!fogRef.current || fogRef.current.color.getHex() !== 0xffffff) {
+            fogRef.current = new THREE.Fog(0xffffff, 50, 200);
             sceneRef.current.fog = fogRef.current;
           }
           starsRef.current.stars.visible = false;
           starsRef.current.nebula.visible = false;
         } else if (altitudeKm < 100) {
           const ratio = (altitudeKm - 50) / 50;
-          const r = Math.round(0x87 * (1 - ratio) + 0x0a * ratio);
-          const g = Math.round(0xce * (1 - ratio) + 0x0a * ratio);
-          const b = Math.round(0xeb * (1 - ratio) + 0x1a * ratio);
+          const r = Math.round(0xff * (1 - ratio) + 0x0a * ratio);
+          const g = Math.round(0xff * (1 - ratio) + 0x0a * ratio);
+          const b = Math.round(0xff * (1 - ratio) + 0x1a * ratio);
           const color = (r << 16) | (g << 8) | b;
           bgColorsRef.current.transition.setHex(color);
           sceneRef.current.background = bgColorsRef.current.transition;
@@ -254,40 +275,96 @@ export default function LiftoffPage() {
       if (rocketRef.current) {
         const rocket = rocketRef.current;
         const currentAltitude = Math.max(0, rocket.position.y - GROUND_LEVEL);
+        const altitudeKm = currentAltitude * SCALE_FACTOR;
 
-        const thrust = calculateThrust(thrustActiveRef.current, thrustPowerRef.current, fuelRef.current);
+        gustTimeRef.current += delta;
+        const gustWave = Math.sin(gustTimeRef.current * 1.2) * Math.cos(gustTimeRef.current * 0.7);
+        windGustRef.current = gustWave * currentMissionConfig.wind;
+
+
+
+        if (currentMissionConfig.enableMalfunction) {
+          if (malfunctionRef.current.active) {
+            malfunctionRef.current.timeLeft -= delta;
+            if (malfunctionRef.current.timeLeft <= 0) {
+              malfunctionRef.current.active = false;
+              setMalfunctionAlert('');
+            }
+          } else if (thrustActiveRef.current && Math.random() < PHYSICS.MALFUNCTION_CHANCE * delta) {
+            malfunctionRef.current.active = true;
+            malfunctionRef.current.timeLeft = PHYSICS.MALFUNCTION_DURATION;
+            setMalfunctionAlert('ENGINE CUT!');
+            setTimeout(() => setMalfunctionAlert(''), 500);
+          }
+        }
+
+        if (currentMissionConfig.enableStaging && !stageSeparatedRef.current && altitudeKm > 100 && thrustActiveRef.current) {
+          stageSeparatedRef.current = true;
+          setStageSeparated(true);
+          massRef.current -= PHYSICS.STAGE1_FUEL;
+          fuelRef.current = PHYSICS.STAGE2_FUEL;
+        }
+
+        if (boostActive && boostFuelRef.current > 0) {
+          boostFuelRef.current -= delta * 10;
+          fuelRef.current -= delta * 2;
+          if (boostFuelRef.current <= 0) {
+            boostFuelRef.current = 0;
+            setBoostActive(false);
+          }
+          setBoostFuel(Math.max(0, boostFuelRef.current));
+        }
+
+        let thrustMultiplier = boostActive ? 1.8 : 1.0;
+
+        if (malfunctionRef.current.active) {
+          thrustMultiplier *= 0.0;
+        }
+
+        const thrust = calculateThrust(thrustActiveRef.current, thrustPowerRef.current * thrustMultiplier, fuelRef.current);
         const altitudeGravity = calculateGravityWithAltitude(gravityRef.current, currentAltitude);
+        
+        let dragMult = 1.0;
+        if (altitudeKm < 50) dragMult = 2.0;
+        else if (altitudeKm < 100) dragMult = 1.5;
+        else if (altitudeKm < 300) dragMult = 1.2;
         const acceleration = calculateAcceleration({
           thrust,
           gravity: altitudeGravity,
-          dragCoefficient: dragCoefficientRef.current,
+          dragCoefficient: dragCoefficientRef.current * dragMult,
           mass: massRef.current,
           fuel: fuelRef.current,
           velocity: velocityRef.current,
         });
 
-        const physicsUpdate = updatePhysics(
-          velocityRef.current,
-          acceleration,
-          rocket.position.y,
-          delta,
-          fuelConsumptionRef.current,
-          thrustActiveRef.current,
-          fuelRef.current
-        );
+        let fuelConsumption = fuelConsumptionRef.current;
+         if (fastForwardActive) fuelConsumption *= 2.0;
+         if (boostActive) fuelConsumption *= 1.5;
 
-        velocityRef.current = physicsUpdate.newVelocity;
-        fuelRef.current = unlimitedFuel ? PHYSICS.INITIAL_FUEL : physicsUpdate.newFuel;
+         const physicsUpdate = updatePhysics(
+           velocityRef.current,
+           acceleration,
+           rocket.position.y,
+           delta,
+           fuelConsumption,
+           thrustActiveRef.current,
+           fuelRef.current
+         );
+
+         velocityRef.current = physicsUpdate.newVelocity;
+         fuelRef.current = unlimitedFuel ? PHYSICS.INITIAL_FUEL : physicsUpdate.newFuel;
 
         const rotationSpeed = 0.45;
         const rotationDamping = 0.68;
         const maxRotation = Math.PI / 1.8;
 
-
-
+        rocket.rotation.x += tiltInputRef.current.x * 0.08;
+        rocket.rotation.z += tiltInputRef.current.z * 0.08;
         rocket.rotation.x = Math.max(-maxRotation, Math.min(maxRotation, rocket.rotation.x));
         rocket.rotation.z = Math.max(-maxRotation, Math.min(maxRotation, rocket.rotation.z));
         rocket.rotation.y = 0;
+
+        setTiltDisplay({ x: Math.round(rocket.rotation.x * 100) / 100, z: Math.round(rocket.rotation.z * 100) / 100 });
 
         let thrustDirectionX = Math.sin(rocket.rotation.x);
         let thrustDirectionY = -Math.cos(rocket.rotation.z);
@@ -303,7 +380,6 @@ export default function LiftoffPage() {
         const currentMass = massRef.current + fuelRef.current * 5;
         const thrustMagnitude = thrust / (currentMass / 1000);
 
-        const altitudeKm = currentAltitude * SCALE_FACTOR;
         const heavyDrag = 0.75;
         const spaceDrag = 0.95;
         const atmosphericDrag = altitudeKm < 100 ? heavyDrag : spaceDrag;
@@ -316,9 +392,14 @@ export default function LiftoffPage() {
         lateralVelocityXRef.current = Math.max(-maxLateralVel, Math.min(maxLateralVel, lateralVelocityXRef.current));
         lateralVelocityZRef.current = Math.max(-maxLateralVel, Math.min(maxLateralVel, lateralVelocityZRef.current));
 
-        lateralVelocityXRef.current += thrustDirectionX * thrustMagnitude * delta * 200;
-        lateralVelocityZRef.current += thrustDirectionZ * thrustMagnitude * delta * 200;
+        const effectiveWindX = windGustRef.current;
+        const effectiveWindZ = windGustRef.current * 0.5;
+        
+        lateralVelocityXRef.current += thrustDirectionX * thrustMagnitude * delta * 200 + effectiveWindX * delta * 30;
+        lateralVelocityZRef.current += thrustDirectionZ * thrustMagnitude * delta * 200 + effectiveWindZ * delta * 30;
         velocityRef.current += (-thrustDirectionY * thrustMagnitude - altitudeGravity * 1.2) * delta * 85;
+        
+        setWindDisplay({ x: Math.round(effectiveWindX * 100) / 100, z: Math.round(effectiveWindZ * 100) / 100 });
 
         rocket.position.x += lateralVelocityXRef.current * delta * 60;
         rocket.position.z += lateralVelocityZRef.current * delta * 60;
@@ -355,7 +436,22 @@ export default function LiftoffPage() {
 
         const newAltitudeKm = newAltitude * SCALE_FACTOR;
         const speedKmS = totalVelocityMagnitude * SCALE_FACTOR;
-        const inOrbitNow = newAltitudeKm >= 1000;
+        
+        if (currentMissionConfig.enablePrecisionOrbit) {
+          if (newAltitudeKm >= ORBITAL_INSERT_ALTITUDE_MIN && newAltitudeKm <= ORBITAL_INSERT_ALTITUDE_MAX &&
+              speedKmS >= ORBITAL_INSERT_VELOCITY_MIN && speedKmS <= ORBITAL_INSERT_VELOCITY_MAX) {
+            setOrbitalInsertStatus('PERFECT INSERTION');
+          } else if (newAltitudeKm >= 950 && newAltitudeKm <= 1050) {
+            setOrbitalInsertStatus(`ALT: ${newAltitudeKm.toFixed(0)}km | VEL: ${speedKmS.toFixed(1)}km/s`);
+          } else {
+            setOrbitalInsertStatus('');
+          }
+        }
+
+        const inOrbitNow = currentMissionConfig.enablePrecisionOrbit ? 
+          (newAltitudeKm >= ORBITAL_INSERT_ALTITUDE_MIN && newAltitudeKm <= ORBITAL_INSERT_ALTITUDE_MAX &&
+           speedKmS >= ORBITAL_INSERT_VELOCITY_MIN && speedKmS <= ORBITAL_INSERT_VELOCITY_MAX) :
+          (newAltitudeKm >= 1000);
 
         const inAtmosphere = newAltitudeKm < 100;
         const dragScaleFactor = Math.max(0.5, 1 - dragCoefficientRef.current * 5000);
@@ -386,11 +482,37 @@ export default function LiftoffPage() {
         celebrationShake = Math.sin(orbitCelebrationTime * 8) * (progress > 0.5 ? (1 - progress) * 0.3 : progress * 0.3);
       }
 
+      if (mathQuestion) {
+        questionTimeRef.current -= delta;
+        setQuestionTimeLeft(Math.max(0, questionTimeRef.current));
+        
+        if (questionTimeRef.current <= 0) {
+          setMathQuestion(null);
+          setQuestionTimeLeft(0);
+          thrustActiveRef.current = false;
+          setThrustActive(false);
+          fuelRef.current -= 20;
+          nextQuestionTimeRef.current = Math.random() * 5 + 5;
+        }
+      } else if (gameState !== 'orbit' && !orbitMode && hasLaunchedRef.current) {
+        nextQuestionTimeRef.current -= delta;
+        if (nextQuestionTimeRef.current <= 0) {
+          generateMathQuestion();
+        }
+      }
+
+      if (mathQuestion) {
+        thrustActiveRef.current = true;
+        setThrustActive(true);
+      } else {
+        thrustActiveRef.current = false;
+      }
+
       let dragShake = 0;
 
-      const thrustShake = (thrustActiveRef.current && fuelRef.current > 0 ? 0.15 : 0);
-      const launchShake = hasLaunchedRef.current && fuelRef.current > 0 ? 0.08 : 0;
-      const shakeIntensity = thrustShake + launchShake + celebrationShake + Math.abs(dragShake);
+       const thrustShake = (thrustActiveRef.current && fuelRef.current > 0 ? 0.15 : 0);
+        const launchShake = hasLaunchedRef.current && fuelRef.current > 0 ? 0.08 : 0;
+        const shakeIntensity = thrustShake + launchShake + celebrationShake + Math.abs(dragShake);
       cameraShakeRef.current.targetIntensity = shakeIntensity;
       cameraShakeRef.current.intensity += (cameraShakeRef.current.targetIntensity - cameraShakeRef.current.intensity) * 0.15;
 
@@ -421,7 +543,7 @@ export default function LiftoffPage() {
 
       if (rocketRef.current) {
         baseLight.position.set(rocketRef.current.position.x, rocketRef.current.position.y - 6, rocketRef.current.position.z);
-        const flicker = thrustActiveRef.current ? Math.sin(performance.now() * 0.005) * 0.6 + 1.5 : 0.03;
+        const flicker = thrustActiveRef.current ? Math.sin(performance.now() * 0.005) * 0.3 + 0.8 : 0.2;
         baseLight.intensity = flicker;
       }
 
@@ -440,9 +562,9 @@ export default function LiftoffPage() {
         positions[idx * 3] = rocketRef.current.position.x;
         positions[idx * 3 + 1] = rocketRef.current.position.y;
         positions[idx * 3 + 2] = rocketRef.current.position.z;
-        colors[idx * 3] = 0.9;
-        colors[idx * 3 + 1] = 0.7;
-        colors[idx * 3 + 2] = 0.3;
+        colors[idx * 3] = 0.2;
+        colors[idx * 3 + 1] = 0.2;
+        colors[idx * 3 + 2] = 0.2;
 
         const fadeIdx = (idx + 1) % TRAIL_SIZE;
         colors[fadeIdx * 3] *= 0.98;
@@ -484,19 +606,60 @@ export default function LiftoffPage() {
       setFollowRocket(true);
     };
 
+    const generateMathQuestion = () => {
+      const num1 = Math.floor(Math.random() * 25) + 5;
+      const num2 = Math.floor(Math.random() * 25) + 5;
+      const op = Math.random() > 0.5 ? '+' : '*';
+      const correct = op === '+' ? num1 + num2 : num1 * num2;
+      const wrong1 = correct + Math.floor(Math.random() * 15) + 2;
+      const wrong2 = Math.max(1, correct - Math.floor(Math.random() * 15) - 2);
+      const answers = [correct, wrong1, wrong2].sort(() => Math.random() - 0.5);
+      setMathQuestion({
+        q: `${num1} ${op} ${num2}`,
+        answers,
+        correct
+      });
+      questionTimeRef.current = 8;
+      setQuestionTimeLeft(8);
+    };
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
         e.preventDefault();
-        setThrustActive(true);
-        thrustActiveRef.current = true;
+        if (!mathQuestion && gameState !== 'orbit' && !orbitMode) {
+          generateMathQuestion();
+        }
+      }
+      if ((e.key === 'w' || e.key === 'W') && !gameState.includes('crashed')) {
+        if (e.shiftKey) {
+          if (rocketRef.current && altitude * SCALE_FACTOR > 400 && fuelRef.current > 25) {
+            const currentAlt = altitude * SCALE_FACTOR;
+            const targetAlt = Math.min(currentAlt + 250, 1100);
+            rocketRef.current.position.y = GROUND_LEVEL + (targetAlt / SCALE_FACTOR);
+            velocityRef.current *= 1.3;
+            fuelRef.current -= 25;
+          }
+        } else {
+          tiltInputRef.current.x = Math.max(-1, tiltInputRef.current.x - 0.1);
+        }
+      }
+      if (e.key === 's' || e.key === 'S') tiltInputRef.current.x = Math.min(1, tiltInputRef.current.x + 0.1);
+      if (e.key === 'a' || e.key === 'A') tiltInputRef.current.z = Math.max(-1, tiltInputRef.current.z - 0.1);
+      if (e.key === 'd' || e.key === 'D') tiltInputRef.current.z = Math.min(1, tiltInputRef.current.z + 0.1);
+      if (e.key === 'f' || e.key === 'F') setFastForwardActive(!fastForwardActive);
+      if (e.key === 'b' || e.key === 'B') {
+        if (fuelRef.current > 20) {
+          setBoostActive(true);
+          boostFuelRef.current = 15;
+        }
       }
     };
 
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') {
-        setThrustActive(false);
-        thrustActiveRef.current = false;
-      }
+      if (e.key === 'w' || e.key === 'W') tiltInputRef.current.x = 0;
+      if (e.key === 's' || e.key === 'S') tiltInputRef.current.x = 0;
+      if (e.key === 'a' || e.key === 'A') tiltInputRef.current.z = 0;
+      if (e.key === 'd' || e.key === 'D') tiltInputRef.current.z = 0;
     };
 
     window.addEventListener('keydown', onKeyDown);
@@ -523,10 +686,10 @@ export default function LiftoffPage() {
     velocityRef.current = 0;
     lateralVelocityXRef.current = 0;
     lateralVelocityZRef.current = 0;
-    fuelRef.current = PHYSICS.INITIAL_FUEL;
+    fuelRef.current = currentMissionConfig.fuel;
     setAltitude(0);
     setSpeed(0);
-    setFuelPercent(PHYSICS.INITIAL_FUEL);
+    setFuelPercent(currentMissionConfig.fuel);
     setThrustActive(false);
     setInOrbit(false);
     setGameState('ready');
@@ -536,11 +699,29 @@ export default function LiftoffPage() {
     hasLaunchedRef.current = false;
     setFadeOut(false);
     setMissionProgress(0);
+    engineTempRef.current = 0;
+    setEngineTemp(0);
+    setEngineStatus('OK');
+    malfunctionRef.current = { active: false, timeLeft: 0 };
+    setMalfunctionAlert('');
+    stageSeparatedRef.current = false;
+    setStageSeparated(false);
+    setOrbitalInsertStatus('');
+    tiltInputRef.current = { x: 0, z: 0 };
+    setTiltDisplay({ x: 0, z: 0 });
+    setFastForwardActive(false);
+    setBoostActive(false);
+    boostFuelRef.current = 0;
+    setBoostFuel(0);
+    setWarpActive(false);
+    setMathQuestion(null);
+    setQuestionTimeLeft(0);
+    questionTimeRef.current = 0;
+    nextQuestionTimeRef.current = 0;
   };
 
   if (showTitle && !showMissionSelect) {
     const handleContinueClick = () => {
-      console.log('Continue button clicked!');
       setShowMissionSelect(true);
     };
 
@@ -549,13 +730,12 @@ export default function LiftoffPage() {
         <div className="title-content">
           <div className="title-text">LIFTOFF</div>
           <div className="title-subtitle">ROCKET SIMULATOR</div>
-          <div style={{ fontSize: '11px', lineHeight: '1.8', marginTop: '32px', maxWidth: '400px', letterSpacing: '0.5px', opacity: 0.8 }}>
+          <div style={{ fontSize: '11px', lineHeight: '1.8', marginTop: '32px', maxWidth: '400px', letterSpacing: '0.5px', opacity: 0.7 }}>
             REACH ORBITAL ALTITUDE (1000 KM) WITH LIMITED FUEL<br/><br/>
             SPACE = THROTTLE<br/>
             DRAG TO ADJUST POV<br/>
             DOUBLE CLICK TO RESET VIEW<br/><br/>
-            MANAGE THRUST, GRAVITY, AND DRAG<br/>
-            IN OPTIONS TO FIND YOUR BALANCE
+            MANAGE YOUR ROCKET TO ACHIEVE ORBIT
           </div>
         </div>
         <button 
@@ -564,9 +744,9 @@ export default function LiftoffPage() {
           onMouseDown={handleContinueClick}
           style={{
             padding: '12px 28px',
-            border: '1px solid white',
-            background: '#000000',
-            color: '#ffffff',
+            border: '1px solid black',
+            background: '#ffffff',
+            color: '#000000',
             fontSize: '11px',
             fontWeight: 400,
             letterSpacing: '1px',
@@ -581,7 +761,7 @@ export default function LiftoffPage() {
             display: 'block'
           }}
         >
-          Continue
+          START
         </button>
       </div>
     );
@@ -589,7 +769,6 @@ export default function LiftoffPage() {
 
   if (showTitle && showMissionSelect) {
     const handleMissionSelect = (missionName: string) => {
-      console.log('Mission selected:', missionName);
       const mission = Object.values(MISSIONS).find(m => m.name === missionName);
       if (mission) {
         fuelRef.current = mission.fuel;
@@ -597,6 +776,12 @@ export default function LiftoffPage() {
         gravityRef.current = mission.gravity;
         setGravity(mission.gravity);
         windForceRef.current = mission.wind;
+        setCurrentMissionConfig(mission);
+        stageSeparatedRef.current = false;
+        setStageSeparated(false);
+        engineTempRef.current = 0;
+        setEngineTemp(0);
+        malfunctionRef.current = { active: false, timeLeft: 0 };
       }
       setCurrentMission(missionName);
       setShowTitle(false);
@@ -615,9 +800,9 @@ export default function LiftoffPage() {
                 onClick={() => handleMissionSelect(mission.name)}
                 style={{
                   padding: '16px 32px',
-                  border: '1px solid white',
-                  background: currentMission === mission.name ? '#ffffff' : '#000000',
-                  color: currentMission === mission.name ? '#000000' : '#ffffff',
+                  border: '1px solid black',
+                  background: currentMission === mission.name ? '#000000' : '#ffffff',
+                  color: currentMission === mission.name ? '#ffffff' : '#000000',
                   fontSize: '12px',
                   fontWeight: 400,
                   letterSpacing: '1px',
@@ -658,18 +843,38 @@ export default function LiftoffPage() {
       ) : null}
 
       {!orbitMode && <div className="controls-box">
-        <button
-          onClick={handleReset}
-          className="control-btn reset-btn"
-          type="button"
-        >
-          Reset
-        </button>
-        <div style={{ fontSize: '9px', opacity: 0.5, marginTop: '12px', letterSpacing: '0.5px', lineHeight: '1.5' }}>
-          SPACE TO THRUST<br/>
-          DRAG TO LOOK<br/>
-          DOUBLE CLICK RESET VIEW
+         <button
+           onClick={handleReset}
+           className="control-btn reset-btn"
+           type="button"
+         >
+           Reset
+         </button>
+         <div style={{ fontSize: '9px', opacity: 0.5, marginTop: '12px', letterSpacing: '0.5px', lineHeight: '1.6' }}>
+           SPACE = SOLVE MATH<br/>
+           W/S = PITCH<br/>
+           A/D = ROLL<br/>
+           DRAG = LOOK<br/>
+           <span style={{ marginTop: '8px', display: 'block', borderTop: '1px solid rgba(255,255,255,0.3)', paddingTop: '8px' }}>
+           F = 2X SPEED<br/>
+           B = BOOST (15 fuel)<br/>
+           SHIFT+W = WARP (25 fuel)
+           </span>
+         </div>
+       </div>}
+
+      {!orbitMode && <div className="wind-indicator">
+        <div>WIND</div>
+        <div className="wind-arrow">
+          {windDisplay.x > 0.5 ? '→' : windDisplay.x < -0.5 ? '←' : '↕'}
         </div>
+        <div style={{ fontSize: '8px', marginTop: '4px', opacity: 0.8 }}>
+          {Math.abs(windDisplay.x).toFixed(2)}
+        </div>
+      </div>}
+
+      {!orbitMode && <div className="tilt-indicator">
+        PITCH: {tiltDisplay.x.toFixed(2)} | ROLL: {tiltDisplay.z.toFixed(2)}
       </div>}
 
       {!orbitMode && <div className="config-box">
@@ -777,9 +982,6 @@ export default function LiftoffPage() {
               }}
             />
           </div>
-
-
-
         </div>
       </div>}
 
@@ -795,23 +997,211 @@ export default function LiftoffPage() {
           fontFamily: "'Courier New', monospace",
           textAlign: 'center',
           borderBottom: '1px solid #ffffff',
-          paddingBottom: '8px'
+          paddingBottom: '8px',
+          background: 'rgba(0, 0, 0, 0.6)',
+          padding: '8px 16px 8px 16px'
         }}>
           {currentMission} MISSION<br/>
-          <span style={{ fontSize: '10px', opacity: 0.7 }}>PROGRESS: {Math.min(100, missionProgress).toFixed(0)}%</span>
+          <span style={{ fontSize: '10px', opacity: 0.8 }}>PROGRESS: {Math.min(100, missionProgress).toFixed(0)}%</span>
         </div>
+        
+
+        {malfunctionAlert && (
+          <div style={{
+            position: 'absolute',
+            top: '140px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            fontSize: '11px',
+            letterSpacing: '1px',
+            color: '#ff0000',
+            fontFamily: "'Courier New', monospace",
+            background: 'rgba(0, 0, 0, 0.8)',
+            padding: '8px 16px',
+            border: '1px solid #ff0000',
+            animation: 'pulse 0.2s ease-in-out'
+          }}>
+            {malfunctionAlert}
+          </div>
+        )}
+        
+        {currentMissionConfig.enableStaging && (
+          <div style={{
+            position: 'absolute',
+            top: '170px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            fontSize: '9px',
+            letterSpacing: '0.5px',
+            color: stageSeparated ? '#00ff00' : '#ffffff',
+            fontFamily: "'Courier New', monospace",
+            background: 'rgba(0, 0, 0, 0.6)',
+            padding: '4px 10px',
+            opacity: stageSeparated ? 1 : 0.6
+          }}>
+            STAGE: {stageSeparated ? 'SEPARATED' : 'ATTACHED'}
+          </div>
+        )}
+        
+        {currentMissionConfig.enablePrecisionOrbit && orbitalInsertStatus && (
+          <div style={{
+            position: 'absolute',
+            bottom: '100px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            fontSize: '10px',
+            letterSpacing: '0.5px',
+            color: orbitalInsertStatus === 'PERFECT INSERTION' ? '#00ff00' : '#ffaa00',
+            fontFamily: "'Courier New', monospace",
+            background: 'rgba(0, 0, 0, 0.6)',
+            padding: '6px 12px',
+            border: `1px solid ${orbitalInsertStatus === 'PERFECT INSERTION' ? '#00ff00' : '#ffaa00'}`
+          }}>
+            {orbitalInsertStatus}
+          </div>
+        )}
+        
+        {boostActive && (
+          <div style={{
+            position: 'absolute',
+            bottom: '140px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            fontSize: '12px',
+            letterSpacing: '1px',
+            color: '#ffff00',
+            fontFamily: "'Courier New', monospace",
+            background: 'rgba(0, 0, 0, 0.7)',
+            padding: '8px 16px',
+            border: '2px solid #ffff00',
+            animation: 'pulse 0.3s ease-in-out'
+          }}>
+            ⚡ BOOST! ({boostFuel.toFixed(1)})
+          </div>
+        )}
+        
+        {fastForwardActive && (
+          <div style={{
+            position: 'absolute',
+            bottom: '180px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            fontSize: '11px',
+            letterSpacing: '1px',
+            color: '#ff6600',
+            fontFamily: "'Courier New', monospace",
+            background: 'rgba(0, 0, 0, 0.7)',
+            padding: '6px 14px',
+            border: '1px solid #ff6600'
+          }}>
+            ⏩ 2X SPEED
+          </div>
+        )}
+        
+        {mathQuestion && (
+          <div style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 999,
+            pointerEvents: 'auto'
+          }}>
+            <div style={{
+              fontSize: '28px',
+              letterSpacing: '2px',
+              color: '#00ff00',
+              fontFamily: "'Courier New', monospace",
+              marginBottom: '20px',
+              textAlign: 'center'
+            }}>
+              SOLVE TO THRUST
+            </div>
+            <div style={{
+              fontSize: '18px',
+              letterSpacing: '1px',
+              color: questionTimeLeft <= 3 ? '#ff4444' : '#ffff00',
+              fontFamily: "'Courier New', monospace",
+              marginBottom: '40px',
+              textAlign: 'center',
+              fontWeight: 'bold'
+            }}>
+              TIME: {questionTimeLeft.toFixed(1)}s
+            </div>
+            <div style={{
+              fontSize: '48px',
+              letterSpacing: '2px',
+              color: '#ffff00',
+              fontFamily: "'Courier New', monospace",
+              marginBottom: '80px',
+              textAlign: 'center',
+              fontWeight: 'bold'
+            }}>
+              {mathQuestion.q}
+            </div>
+            <div style={{
+              display: 'flex',
+              gap: '30px',
+              justifyContent: 'center',
+              flexWrap: 'wrap'
+            }}>
+              {mathQuestion.answers.map((ans, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    if (ans === mathQuestion.correct) {
+                      setMathQuestion(null);
+                      setQuestionTimeLeft(0);
+                      nextQuestionTimeRef.current = Math.random() * 5 + 5;
+                    } else {
+                      fuelRef.current -= 15;
+                      setMathQuestion(null);
+                      setQuestionTimeLeft(0);
+                      nextQuestionTimeRef.current = Math.random() * 5 + 5;
+                    }
+                  }}
+                  style={{
+                    padding: '30px 60px',
+                    fontSize: '32px',
+                    fontFamily: "'Courier New', monospace",
+                    background: '#000000',
+                    color: '#ffffff',
+                    border: '3px solid #ffffff',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    letterSpacing: '2px',
+                    fontWeight: 'bold'
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.target as HTMLElement).style.background = '#ffffff';
+                    (e.target as HTMLElement).style.color = '#000000';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.target as HTMLElement).style.background = '#000000';
+                    (e.target as HTMLElement).style.color = '#ffffff';
+                  }}
+                >
+                  {ans}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="hud-corner-top-left">
-          V {(speed / 1000).toFixed(2)}<br/>
-          KM/S
-        </div>
-        <div className={`hud-corner-top-right ${fuelPercent > 30 ? 'fuel-good' : 'fuel-low'}`}>
-          F {fuelPercent.toFixed(0)}<br/>
-          %
-        </div>
-        <div className="hud-corner-bottom-left">
-          A {(altitude * SCALE_FACTOR).toFixed(0)}<br/>
-          KM
-        </div>
+           <div style={{ color: '#000000' }}>V {(speed / 1000).toFixed(2)}</div><br/>
+           <div style={{ color: '#000000' }}>KM/S</div>
+         </div>
+         <div className={`hud-corner-top-right ${fuelPercent > 30 ? 'fuel-good' : 'fuel-low'}`}>
+           <div style={{ color: '#000000' }}>F {fuelPercent.toFixed(0)}</div><br/>
+           <div style={{ color: '#000000' }}>%</div>
+         </div>
+         <div className="hud-corner-bottom-left">
+           <div style={{ color: '#000000' }}>A {(altitude * SCALE_FACTOR).toFixed(0)}</div><br/>
+           <div style={{ color: '#000000' }}>KM</div>
+         </div>
         <div className="hud-altitude-meter">
           <span>ALT</span>
           <div className="altitude-bar">
@@ -822,24 +1212,25 @@ export default function LiftoffPage() {
           </div>
         </div>
         <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          fontSize: '12px',
-          letterSpacing: '1px',
-          color: '#ffffff',
-          fontFamily: "'Courier New', monospace",
-          pointerEvents: 'none'
-        }}>
-          {altitude * SCALE_FACTOR < 100 && 'ATMOSPHERE'}
-          {altitude * SCALE_FACTOR >= 100 && altitude * SCALE_FACTOR < 500 && 'LEAVING ATMOSPHERE'}
-          {altitude * SCALE_FACTOR >= 500 && altitude * SCALE_FACTOR < 1000 && 'NEAR ORBIT'}
-          {altitude * SCALE_FACTOR >= 1000 && 'ORBITAL INSERTION'}
-        </div>
+           position: 'absolute',
+           top: '50%',
+           left: '50%',
+           transform: 'translateX(-50%)',
+           fontSize: '12px',
+           letterSpacing: '1px',
+           color: '#000000',
+           fontFamily: "'Courier New', monospace",
+           pointerEvents: 'none',
+           background: 'rgba(255, 255, 255, 0.85)',
+           padding: '12px 24px',
+           border: '1px solid #000000'
+         }}>
+           {altitude * SCALE_FACTOR < 100 && 'ATMOSPHERE'}
+           {altitude * SCALE_FACTOR >= 100 && altitude * SCALE_FACTOR < 500 && 'LEAVING ATMOSPHERE'}
+           {altitude * SCALE_FACTOR >= 500 && altitude * SCALE_FACTOR < 1000 && 'NEAR ORBIT'}
+           {altitude * SCALE_FACTOR >= 1000 && 'ORBITAL INSERTION'}
+         </div>
       </div>}
-
-
 
       {fadeOut && (
         <div style={{

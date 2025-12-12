@@ -119,20 +119,21 @@ export function animateParticles(
   const totalChaos = (speedChaos + altitudeChaos) * (0.8 + thrustFactor * 0.4);
   const altitudeFactor = Math.max(0.5, 1 - ry / 1000);
 
+  const cosPitch = Math.cos(rocketRotation.x);
+  const sinPitch = Math.sin(rocketRotation.x);
+  const cosRoll = Math.cos(rocketRotation.z);
+  const sinRoll = Math.sin(rocketRotation.z);
 
-
-  let thrustDirX = Math.sin(rocketRotation.x);
-  let thrustDirY = -Math.cos(rocketRotation.z);
-  let thrustDirZ = Math.sin(rocketRotation.z);
+  let thrustDirX = -sinPitch * sinRoll;
+  let thrustDirY = -cosPitch;
+  let thrustDirZ = -sinPitch * cosRoll;
   
-
   const thrustLen = Math.sqrt(thrustDirX * thrustDirX + thrustDirY * thrustDirY + thrustDirZ * thrustDirZ);
   if (thrustLen > 0) {
     thrustDirX /= thrustLen;
     thrustDirY /= thrustLen;
     thrustDirZ /= thrustLen;
   }
-
 
   const hash = (i: number, seed: number) => {
     const x = Math.sin(i * 73.156 + seed * 12.989) * 43758.5453;
@@ -159,7 +160,6 @@ export function animateParticles(
     flameVel[i * 3 + 2] *= 0.97;
     flameVel[i * 3 + 1] *= 0.94;
 
-
     const colorPhase = lifeRatio;
     if (colorPhase < 0.4) {
       flameColor[i * 3] = 1.0;
@@ -185,7 +185,6 @@ export function animateParticles(
       const velHash1 = hash(i, 40.0);
       const velHash2 = hash(i, 50.0);
       const velHash3 = hash(i, 60.0);
-
 
       const perpX = -thrustDirZ;
       const perpZ = thrustDirX;
@@ -232,7 +231,6 @@ export function animateParticles(
       const sVelHash2 = hash(i + 200, 50.0);
       const sVelHash3 = hash(i + 200, 60.0);
 
-
       const sPerpX = -thrustDirZ;
       const sPerpZ = thrustDirX;
 
@@ -252,10 +250,8 @@ export function animateParticles(
   flameRef.geometry.attributes.lifetime.needsUpdate = true;
   flameRef.geometry.attributes.color.needsUpdate = true;
 
-
   smokeRef.geometry.attributes.position.needsUpdate = true;
   smokeRef.geometry.attributes.lifetime.needsUpdate = true;
-
 
   const flameMat = flameRef.material as THREE.PointsMaterial;
   const smokeMat = smokeRef.material as THREE.PointsMaterial;
@@ -263,7 +259,6 @@ export function animateParticles(
   if (thrustActive) {
     flameMat.size = particleScale * (2.5 + thrustFactor * 3.0 + totalChaos * 1.2);
     smokeMat.size = particleScale * (2.0 + thrustFactor * 2.5 + totalChaos * 0.8);
-
 
     flameMat.opacity = Math.max(0.8, Math.min(1, 0.9 + thrustFactor * 0.1));
 

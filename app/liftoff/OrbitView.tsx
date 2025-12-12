@@ -37,16 +37,16 @@ export function OrbitView({ altitude, speed }: OrbitViewProps) {
       const cy = canvas.height / 2;
 
       if (showSolar) {
-        ctx.fillStyle = '#FDB813';
+        ctx.fillStyle = '#cccccc';
         ctx.beginPath();
         ctx.arc(cx, cy, 50, 0, Math.PI * 2);
         ctx.fill();
 
         const pData = [
-          { d: 150, s: 15, c: '#8C7853', sp: 0.04 },
-          { d: 280, s: 20, c: '#FFC649', sp: 0.015 },
-          { d: 410, s: 20, c: '#4DA6FF', sp: 0.01 },
-          { d: 540, s: 15, c: '#E27B58', sp: 0.008 },
+          { d: 150, s: 12, c: '#555555', sp: 0.04 },
+          { d: 280, s: 15, c: '#777777', sp: 0.015 },
+          { d: 410, s: 18, c: '#444444', sp: 0.01 },
+          { d: 540, s: 10, c: '#666666', sp: 0.008 },
         ];
 
         pData.forEach(p => {
@@ -54,7 +54,7 @@ export function OrbitView({ altitude, speed }: OrbitViewProps) {
           const px = cx + Math.cos(ang) * p.d;
           const py = cy + Math.sin(ang) * p.d;
 
-          ctx.strokeStyle = '#444444';
+          ctx.strokeStyle = '#222222';
           ctx.lineWidth = 1;
           ctx.beginPath();
           ctx.arc(cx, cy, p.d, 0, Math.PI * 2);
@@ -66,14 +66,14 @@ export function OrbitView({ altitude, speed }: OrbitViewProps) {
           ctx.fill();
         });
       } else {
-        ctx.fillStyle = '#4DA6FF';
+        ctx.fillStyle = '#555555';
         ctx.beginPath();
         ctx.arc(cx, cy, 80, 0, Math.PI * 2);
         ctx.fill();
 
         const orbitR = 240;
-        ctx.strokeStyle = '#666666';
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#333333';
+        ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(cx, cy, orbitR, 0, Math.PI * 2);
         ctx.stroke();
@@ -95,7 +95,7 @@ export function OrbitView({ altitude, speed }: OrbitViewProps) {
         ctx.translate(rx, ry);
         ctx.rotate(ang + Math.PI / 2);
 
-        ctx.fillStyle = '#FFFFFF';
+        ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.moveTo(0, 15);
         ctx.lineTo(-9, -12);

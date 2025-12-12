@@ -1,15 +1,22 @@
 export const PHYSICS = {
-  THRUST_POWER: 0.015,
+  THRUST_POWER: 0.0138,
   GRAVITY: 0.0018,
-  MASS: 900,
-  DRAG_COEFFICIENT: 0.00008,
-  FUEL_CONSUMPTION: 0.25,
-  INITIAL_FUEL: 300,
+  MASS: 1200,
+  DRAG_COEFFICIENT: 0.00012,
+  FUEL_CONSUMPTION: 0.48,
+  INITIAL_FUEL: 360,
+  STAGE1_FUEL: 190,
+  STAGE2_FUEL: 170,
+  ENGINE_OVERHEAT_THRESHOLD: 1.0,
+  ENGINE_TEMP_COOLDOWN: 0.13,
+  ENGINE_TEMP_BUILDUP: 0.52,
+  MALFUNCTION_CHANCE: 0.035,
+  MALFUNCTION_DURATION: 1.2,
 };
 
 export const PARTICLES = {
-  FLAME_COUNT: 5000,
-  SMOKE_COUNT: 1800,
+  FLAME_COUNT: 3000,
+  SMOKE_COUNT: 1200,
   PARTICLE_SCALE: 1.0,
 };
 
@@ -51,11 +58,10 @@ export const DIAMONDS = {
 };
 
 export const WIND = {
-  X: 0.0004,
+  X: 0.0015,
   Y: 0,
-  Z: 0.00015,
+  Z: 0.0008,
 };
-
 
 export const GROUND_LEVEL = 0;
 export const GROUND_Y = -8;
@@ -68,32 +74,52 @@ export const ORBITAL_VELOCITY = 3.0;
 export const GRAVITY_TRANSITION_START = 50;
 export const GRAVITY_TRANSITION_END = 200;
 export const SCALE_FACTOR = 0.1;
-export const MAX_SPEED_KMS = 11.2;
-export const SPEED_SHAKE_THRESHOLD = 8.0;
+export const MAX_SPEED_KMS = 7.2;
+export const SPEED_SHAKE_THRESHOLD = 6.0;
+
+export const ORBITAL_INSERT_VELOCITY_MIN = 7.5;
+export const ORBITAL_INSERT_VELOCITY_MAX = 8.2;
+export const ORBITAL_INSERT_ALTITUDE_MIN = 950;
+export const ORBITAL_INSERT_ALTITUDE_MAX = 1050;
 
 export const MISSIONS = {
   BEGINNER: { 
-    name: 'BEGINNER', 
-    target: 100, 
-    description: 'Reach 100 KM (No Wind)', 
-    wind: 0.0,
-    fuel: 300,
-    gravity: 0.0018
+    name: 'SUBORBITAL', 
+    target: 150, 
+    description: 'Reach 150 KM', 
+    wind: 0.0004,
+    fuel: 360,
+    gravity: 0.0018,
+    difficulty: 1,
+    enableStaging: false,
+    enableMalfunction: false,
+    enablePrecisionOrbit: false,
+    enableTemperature: false
   },
   INTERMEDIATE: { 
-    name: 'INTERMEDIATE', 
-    target: 500, 
-    description: 'Reach 500 KM (Strong Winds)', 
+    name: 'STAGING', 
+    target: 400, 
+    description: 'Reach 400 KM (Staging Required)', 
     wind: 0.0008,
-    fuel: 280,
-    gravity: 0.0018
+    fuel: 360,
+    gravity: 0.0018,
+    difficulty: 2,
+    enableStaging: true,
+    enableMalfunction: false,
+    enablePrecisionOrbit: false,
+    enableTemperature: true
   },
   ADVANCED: { 
-    name: 'ADVANCED', 
+    name: 'ORBITAL', 
     target: 1000, 
-    description: 'Reach Orbit (Max Difficulty)', 
-    wind: 0.0012,
-    fuel: 250,
-    gravity: 0.002
+    description: 'Achieve Orbit (All Systems)', 
+    wind: 0.0016,
+    fuel: 330,
+    gravity: 0.002,
+    difficulty: 3,
+    enableStaging: true,
+    enableMalfunction: true,
+    enablePrecisionOrbit: true,
+    enableTemperature: true
   },
 };

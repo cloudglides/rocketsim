@@ -15,14 +15,17 @@ export function OrbitSuccess({ altitude, speed, onReset, mission }: OrbitSuccess
       
       <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50">
         <div style={{
-          border: '1px solid white',
+          border: '1px solid black',
           padding: '40px',
           textAlign: 'center',
-          background: '#000000',
+          background: '#ffffff',
           fontFamily: "'Courier New', monospace"
         }}>
           <div style={{ fontSize: '24px', fontWeight: 400, marginBottom: '8px', letterSpacing: '2px' }}>
-            MISSION COMPLETE
+            ORBITAL
+          </div>
+          <div style={{ fontSize: '24px', fontWeight: 400, marginBottom: '24px', letterSpacing: '2px' }}>
+            INSERTION
           </div>
           {mission && <div style={{ fontSize: '12px', marginBottom: '24px', letterSpacing: '1px', opacity: 0.6 }}>
             {mission}
@@ -35,9 +38,9 @@ export function OrbitSuccess({ altitude, speed, onReset, mission }: OrbitSuccess
             onClick={onReset}
             style={{
               padding: '10px 24px',
-              border: '1px solid white',
-              background: '#000000',
-              color: '#ffffff',
+              border: '1px solid black',
+              background: '#ffffff',
+              color: '#000000',
               fontSize: '11px',
               fontWeight: 400,
               letterSpacing: '1px',
@@ -47,12 +50,12 @@ export function OrbitSuccess({ altitude, speed, onReset, mission }: OrbitSuccess
               transition: 'all 0.15s ease'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#ffffff';
-              e.currentTarget.style.color = '#000000';
-            }}
-            onMouseLeave={(e) => {
               e.currentTarget.style.background = '#000000';
               e.currentTarget.style.color = '#ffffff';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#ffffff';
+              e.currentTarget.style.color = '#000000';
             }}
           >
             RESET

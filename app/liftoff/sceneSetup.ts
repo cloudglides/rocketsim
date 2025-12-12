@@ -152,7 +152,6 @@ export function loadRocket(scene: THREE.Scene, groundLevel: number): Promise<THR
       rocket.position.x = 0;
       rocket.position.z = 0;
       scene.add(rocket);
-      console.log("Rocket model loaded successfully");
       resolve(rocket);
     }, 
     (progress) => {
