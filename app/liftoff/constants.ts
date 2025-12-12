@@ -83,43 +83,43 @@ export const ORBITAL_INSERT_ALTITUDE_MIN = 950;
 export const ORBITAL_INSERT_ALTITUDE_MAX = 1050;
 
 export const MISSIONS = {
-  BEGINNER: { 
-    name: 'SUBORBITAL', 
-    target: 150, 
-    description: 'Reach 150 KM', 
-    wind: 0.0004,
-    fuel: 360,
-    gravity: 0.0018,
-    difficulty: 1,
-    enableStaging: false,
-    enableMalfunction: false,
-    enablePrecisionOrbit: false,
-    enableTemperature: false
-  },
-  INTERMEDIATE: { 
-    name: 'STAGING', 
-    target: 400, 
-    description: 'Reach 400 KM (Staging Required)', 
-    wind: 0.0008,
-    fuel: 360,
-    gravity: 0.0018,
-    difficulty: 2,
-    enableStaging: true,
-    enableMalfunction: false,
-    enablePrecisionOrbit: false,
-    enableTemperature: true
-  },
-  ADVANCED: { 
-    name: 'ORBITAL', 
-    target: 1000, 
-    description: 'Achieve Orbit (All Systems)', 
-    wind: 0.0016,
-    fuel: 330,
-    gravity: 0.002,
-    difficulty: 3,
-    enableStaging: true,
-    enableMalfunction: true,
-    enablePrecisionOrbit: true,
-    enableTemperature: true
-  },
-};
+   BEGINNER: { 
+     name: 'CHAPTER 1', 
+     target: 150, 
+     description: 'Basic Arithmetic (Additions)', 
+     wind: 0.0004,
+     fuel: 360,
+     gravity: 0.0018,
+     difficulty: 1,
+     enableStaging: false,
+     enableMalfunction: false,
+     enablePrecisionOrbit: false,
+     enableTemperature: false
+   },
+   INTERMEDIATE: { 
+     name: 'CHAPTER 2', 
+     target: 400, 
+     description: 'Multiplication & Division', 
+     wind: 0.0008,
+     fuel: 360,
+     gravity: 0.0018,
+     difficulty: 2,
+     enableStaging: true,
+     enableMalfunction: false,
+     enablePrecisionOrbit: false,
+     enableTemperature: true
+   },
+   ADVANCED: { 
+     name: 'CHAPTER 3', 
+     target: 1000, 
+     description: 'Advanced Algebra & Mixed Operations', 
+     wind: 0.0016,
+     fuel: 330,
+     gravity: 0.002,
+     difficulty: 3,
+     enableStaging: true,
+     enableMalfunction: true,
+     enablePrecisionOrbit: true,
+     enableTemperature: true
+   },
+ };

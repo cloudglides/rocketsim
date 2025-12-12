@@ -105,9 +105,11 @@ export default function LiftoffPage() {
   const boostFuelRef = useRef(0);
   const [warpActive, setWarpActive] = useState(false);
   const [mathQuestion, setMathQuestion] = useState<{ q: string; answers: number[]; correct: number } | null>(null);
-  const [questionTimeLeft, setQuestionTimeLeft] = useState(0);
-  const questionTimeRef = useRef(0);
-  const nextQuestionTimeRef = useRef(0);
+   const [questionTimeLeft, setQuestionTimeLeft] = useState(0);
+    const questionTimeRef = useRef(0);
+    const nextQuestionTimeRef = useRef(1);
+    const [blastMessage, setBlastMessage] = useState('');
+    const mathQuestionRef = useRef<{ q: string; answers: number[]; correct: number } | null>(null);
 
   useEffect(() => { thrustActiveRef.current = thrustActive; }, [thrustActive]);
   useEffect(() => { thrustPowerRef.current = thrustPower; }, [thrustPower]);
@@ -117,6 +119,7 @@ export default function LiftoffPage() {
   useEffect(() => { particleScaleRef.current = particleScale; }, [particleScale]);
   useEffect(() => { fuelConsumptionRef.current = fuelConsumption; }, [fuelConsumption]);
   useEffect(() => { povOffsetRef.current = povOffsetY; }, [povOffsetY]);
+  useEffect(() => { mathQuestionRef.current = mathQuestion; }, [mathQuestion]);
 
   useEffect(() => {
     if (showTitle) {
@@ -401,14 +404,16 @@ export default function LiftoffPage() {
         
         setWindDisplay({ x: Math.round(effectiveWindX * 100) / 100, z: Math.round(effectiveWindZ * 100) / 100 });
 
-        rocket.position.x += lateralVelocityXRef.current * delta * 60;
-        rocket.position.z += lateralVelocityZRef.current * delta * 60;
-        rocket.position.y += velocityRef.current * delta * 60;
+        if (!mathQuestionRef.current) {
+          rocket.position.x += lateralVelocityXRef.current * delta * 60;
+          rocket.position.z += lateralVelocityZRef.current * delta * 60;
+          rocket.position.y += velocityRef.current * delta * 60;
 
-        if (rocket.position.y <= GROUND_LEVEL) {
-          rocket.position.y = GROUND_LEVEL;
-          if (velocityRef.current < 0) {
-            velocityRef.current = 0;
+          if (rocket.position.y <= GROUND_LEVEL) {
+            rocket.position.y = GROUND_LEVEL;
+            if (velocityRef.current < 0) {
+              velocityRef.current = 0;
+            }
           }
         }
 
@@ -421,6 +426,8 @@ export default function LiftoffPage() {
         const newSpeed = Math.round(Math.abs(totalVelocityMagnitude) * 1000) / 10;
         const newFuelPercent = Math.round(fuelRef.current * 10) / 10;
 
+        const newAltitudeKm = newAltitude * SCALE_FACTOR;
+        
         lastHUDUpdateRef.current += delta;
         if (lastHUDUpdateRef.current >= HUD_UPDATE_INTERVAL) {
           setAltitude(newAltitude);
@@ -429,12 +436,20 @@ export default function LiftoffPage() {
           setMaxAltitudeReached(Math.max(maxAltitudeReached, newAltitude * SCALE_FACTOR));
           const missionDef = Object.values(MISSIONS).find(m => m.name === currentMission);
           if (missionDef) {
-            setMissionProgress((newAltitude * SCALE_FACTOR / missionDef.target) * 100);
+            const progress = (newAltitudeKm / missionDef.target) * 100;
+            setMissionProgress(progress);
+            
+            if (progress >= 100 && gameState === 'flying') {
+              setInOrbit(true);
+              setGameState('orbit');
+              setFadeOut(true);
+              setTimeout(() => {
+                setOrbitMode(true);
+              }, 1200);
+            }
           }
           lastHUDUpdateRef.current = 0;
         }
-
-        const newAltitudeKm = newAltitude * SCALE_FACTOR;
         const speedKmS = totalVelocityMagnitude * SCALE_FACTOR;
         
         if (currentMissionConfig.enablePrecisionOrbit) {
@@ -464,15 +479,7 @@ export default function LiftoffPage() {
 
         if (thrustActiveRef.current && !hasLaunchedRef.current) {
           hasLaunchedRef.current = true;
-        }
-
-        if (inOrbitNow && !inOrbit) {
-          setInOrbit(true);
-          setGameState('orbit');
-          setFadeOut(true);
-          setTimeout(() => {
-            setOrbitMode(true);
-          }, 1200);
+          setGameState('flying');
         }
       }
 
@@ -482,31 +489,35 @@ export default function LiftoffPage() {
         celebrationShake = Math.sin(orbitCelebrationTime * 8) * (progress > 0.5 ? (1 - progress) * 0.3 : progress * 0.3);
       }
 
-      if (mathQuestion) {
-        questionTimeRef.current -= delta;
-        setQuestionTimeLeft(Math.max(0, questionTimeRef.current));
-        
-        if (questionTimeRef.current <= 0) {
-          setMathQuestion(null);
-          setQuestionTimeLeft(0);
-          thrustActiveRef.current = false;
-          setThrustActive(false);
-          fuelRef.current -= 20;
-          nextQuestionTimeRef.current = Math.random() * 5 + 5;
-        }
-      } else if (gameState !== 'orbit' && !orbitMode && hasLaunchedRef.current) {
-        nextQuestionTimeRef.current -= delta;
-        if (nextQuestionTimeRef.current <= 0) {
-          generateMathQuestion();
-        }
-      }
+      if (mathQuestionRef.current) {
+         questionTimeRef.current = Math.max(0, questionTimeRef.current - delta);
+         setQuestionTimeLeft(questionTimeRef.current);
+         
+         if (questionTimeRef.current <= 0) {
+           questionTimeRef.current = 0;
+           setMathQuestion(null);
+           setQuestionTimeLeft(0);
+           thrustActiveRef.current = false;
+           setThrustActive(false);
+           velocityRef.current *= 0.3;
+           fuelRef.current = Math.max(0, fuelRef.current - 20);
+           setFuelPercent(fuelRef.current);
+           setBlastMessage('ROCKET BLASTED');
+           setTimeout(() => setBlastMessage(''), 1500);
+           nextQuestionTimeRef.current = Math.random() * 5 + 5;
+         }
+       } else if (gameState !== 'orbit' && !orbitMode && hasLaunchedRef.current && nextQuestionTimeRef.current > 0) {
+         nextQuestionTimeRef.current -= delta;
+         if (nextQuestionTimeRef.current <= 0) {
+           nextQuestionTimeRef.current = 0;
+           generateMathQuestion();
+         }
+       }
 
-      if (mathQuestion) {
-        thrustActiveRef.current = true;
-        setThrustActive(true);
-      } else {
-        thrustActiveRef.current = false;
-      }
+      if (mathQuestionRef.current) {
+         thrustActiveRef.current = false;
+         setThrustActive(false);
+       }
 
       let dragShake = 0;
 
@@ -607,21 +618,54 @@ export default function LiftoffPage() {
     };
 
     const generateMathQuestion = () => {
-      const num1 = Math.floor(Math.random() * 25) + 5;
-      const num2 = Math.floor(Math.random() * 25) + 5;
-      const op = Math.random() > 0.5 ? '+' : '*';
-      const correct = op === '+' ? num1 + num2 : num1 * num2;
-      const wrong1 = correct + Math.floor(Math.random() * 15) + 2;
-      const wrong2 = Math.max(1, correct - Math.floor(Math.random() * 15) - 2);
-      const answers = [correct, wrong1, wrong2].sort(() => Math.random() - 0.5);
-      setMathQuestion({
-        q: `${num1} ${op} ${num2}`,
-        answers,
-        correct
-      });
-      questionTimeRef.current = 8;
-      setQuestionTimeLeft(8);
-    };
+       let num1, num2, op, correct, wrong1, wrong2;
+       
+       if (currentMissionConfig.difficulty === 1) {
+         num1 = Math.floor(Math.random() * 15) + 1;
+         num2 = Math.floor(Math.random() * 15) + 1;
+         op = '+';
+         correct = num1 + num2;
+         wrong1 = correct + Math.floor(Math.random() * 10) + 1;
+         wrong2 = Math.max(1, correct - Math.floor(Math.random() * 10) - 1);
+       } else if (currentMissionConfig.difficulty === 2) {
+         num1 = Math.floor(Math.random() * 12) + 2;
+         num2 = Math.floor(Math.random() * 12) + 2;
+         op = Math.random() > 0.5 ? '*' : '/';
+         if (op === '*') {
+           correct = num1 * num2;
+           wrong1 = correct + Math.floor(Math.random() * 20) + 2;
+           wrong2 = Math.max(1, correct - Math.floor(Math.random() * 20) - 2);
+         } else {
+           num1 = Math.floor(Math.random() * 100) + 10;
+           num2 = Math.floor(Math.random() * 10) + 2;
+           correct = Math.floor(num1 / num2);
+           wrong1 = correct + Math.floor(Math.random() * 10) + 1;
+           wrong2 = Math.max(0, correct - Math.floor(Math.random() * 10) - 1);
+         }
+       } else {
+         const operations = ['+', '-', '*', '/'];
+         op = operations[Math.floor(Math.random() * operations.length)];
+         num1 = Math.floor(Math.random() * 50) + 10;
+         num2 = Math.floor(Math.random() * 20) + 5;
+         
+         if (op === '+') correct = num1 + num2;
+         else if (op === '-') correct = num1 - num2;
+         else if (op === '*') correct = num1 * num2;
+         else correct = Math.floor(num1 / num2);
+         
+         wrong1 = correct + Math.floor(Math.random() * 50) + 5;
+         wrong2 = Math.max(0, correct - Math.floor(Math.random() * 50) - 5);
+       }
+       
+       const answers = [correct, wrong1, wrong2].sort(() => Math.random() - 0.5);
+       setMathQuestion({
+         q: `${num1} ${op} ${num2}`,
+         answers,
+         correct
+       });
+       questionTimeRef.current = 8;
+       setQuestionTimeLeft(8);
+     };
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
@@ -1026,22 +1070,22 @@ export default function LiftoffPage() {
         )}
         
         {currentMissionConfig.enableStaging && (
-          <div style={{
-            position: 'absolute',
-            top: '170px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            fontSize: '9px',
-            letterSpacing: '0.5px',
-            color: stageSeparated ? '#00ff00' : '#ffffff',
-            fontFamily: "'Courier New', monospace",
-            background: 'rgba(0, 0, 0, 0.6)',
-            padding: '4px 10px',
-            opacity: stageSeparated ? 1 : 0.6
-          }}>
-            STAGE: {stageSeparated ? 'SEPARATED' : 'ATTACHED'}
-          </div>
-        )}
+           <div style={{
+             position: 'absolute',
+             top: '170px',
+             left: '50%',
+             transform: 'translateX(-50%)',
+             fontSize: '9px',
+             letterSpacing: '0.5px',
+             color: stageSeparated ? '#000000' : '#000000',
+             fontFamily: "'Courier New', monospace",
+             background: 'rgba(255, 255, 255, 0.85)',
+             padding: '4px 10px',
+             opacity: stageSeparated ? 1 : 0.6
+           }}>
+             STAGE: {stageSeparated ? 'SEPARATED' : 'ATTACHED'}
+           </div>
+         )}
         
         {currentMissionConfig.enablePrecisionOrbit && orbitalInsertStatus && (
           <div style={{
@@ -1051,11 +1095,11 @@ export default function LiftoffPage() {
             transform: 'translateX(-50%)',
             fontSize: '10px',
             letterSpacing: '0.5px',
-            color: orbitalInsertStatus === 'PERFECT INSERTION' ? '#00ff00' : '#ffaa00',
+            color: '#000000',
             fontFamily: "'Courier New', monospace",
-            background: 'rgba(0, 0, 0, 0.6)',
+            background: 'rgba(255, 255, 255, 0.85)',
             padding: '6px 12px',
-            border: `1px solid ${orbitalInsertStatus === 'PERFECT INSERTION' ? '#00ff00' : '#ffaa00'}`
+            border: '1px solid #000000'
           }}>
             {orbitalInsertStatus}
           </div>
@@ -1113,28 +1157,29 @@ export default function LiftoffPage() {
             <div style={{
               fontSize: '28px',
               letterSpacing: '2px',
-              color: '#00ff00',
+              color: '#ffffff',
               fontFamily: "'Courier New', monospace",
               marginBottom: '20px',
               textAlign: 'center'
             }}>
-              SOLVE TO THRUST
+              SOLVE
             </div>
             <div style={{
-              fontSize: '18px',
-              letterSpacing: '1px',
-              color: questionTimeLeft <= 3 ? '#ff4444' : '#ffff00',
+              fontSize: '72px',
+              letterSpacing: '2px',
+              color: questionTimeLeft <= 3 ? '#ff0000' : '#ffffff',
               fontFamily: "'Courier New', monospace",
               marginBottom: '40px',
               textAlign: 'center',
-              fontWeight: 'bold'
+              fontWeight: 'bold',
+              textShadow: questionTimeLeft <= 3 ? '0 0 20px #ff0000' : 'none'
             }}>
-              TIME: {questionTimeLeft.toFixed(1)}s
+              {Math.ceil(questionTimeLeft)}
             </div>
             <div style={{
-              fontSize: '48px',
+              fontSize: '56px',
               letterSpacing: '2px',
-              color: '#ffff00',
+              color: '#ffffff',
               fontFamily: "'Courier New', monospace",
               marginBottom: '80px',
               textAlign: 'center',
@@ -1153,35 +1198,45 @@ export default function LiftoffPage() {
                   key={idx}
                   onClick={() => {
                     if (ans === mathQuestion.correct) {
+                      questionTimeRef.current = 0;
+                      fuelRef.current = Math.min(currentMissionConfig.fuel, fuelRef.current + 30);
+                      setFuelPercent(fuelRef.current);
                       setMathQuestion(null);
                       setQuestionTimeLeft(0);
+                      setThrustActive(true);
+                      thrustActiveRef.current = true;
                       nextQuestionTimeRef.current = Math.random() * 5 + 5;
                     } else {
-                      fuelRef.current -= 15;
-                      setMathQuestion(null);
-                      setQuestionTimeLeft(0);
-                      nextQuestionTimeRef.current = Math.random() * 5 + 5;
-                    }
+                       questionTimeRef.current = 0;
+                       fuelRef.current = Math.max(0, fuelRef.current - 100);
+                       setFuelPercent(fuelRef.current);
+                       setMathQuestion(null);
+                       setQuestionTimeLeft(0);
+                       setThrustActive(false);
+                       thrustActiveRef.current = false;
+                       velocityRef.current = Math.max(0, velocityRef.current * 0.2);
+                       nextQuestionTimeRef.current = Math.random() * 5 + 5;
+                     }
                   }}
                   style={{
-                    padding: '30px 60px',
-                    fontSize: '32px',
+                    padding: '24px 48px',
+                    fontSize: '36px',
                     fontFamily: "'Courier New', monospace",
-                    background: '#000000',
-                    color: '#ffffff',
-                    border: '3px solid #ffffff',
+                    background: '#ffffff',
+                    color: '#000000',
+                    border: '2px solid #000000',
                     cursor: 'pointer',
-                    transition: 'all 0.2s',
+                    transition: 'all 0.15s',
                     letterSpacing: '2px',
                     fontWeight: 'bold'
                   }}
                   onMouseEnter={(e) => {
-                    (e.target as HTMLElement).style.background = '#ffffff';
-                    (e.target as HTMLElement).style.color = '#000000';
-                  }}
-                  onMouseLeave={(e) => {
                     (e.target as HTMLElement).style.background = '#000000';
                     (e.target as HTMLElement).style.color = '#ffffff';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.target as HTMLElement).style.background = '#ffffff';
+                    (e.target as HTMLElement).style.color = '#000000';
                   }}
                 >
                   {ans}
@@ -1189,8 +1244,27 @@ export default function LiftoffPage() {
               ))}
             </div>
           </div>
-        )}
-        <div className="hud-corner-top-left">
+          )}
+          
+          {blastMessage && (
+          <div style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            fontSize: '64px',
+            fontWeight: 'bold',
+            color: '#ff0000',
+            fontFamily: "'Courier New', monospace",
+            textAlign: 'center',
+            zIndex: 500,
+            textShadow: '0 0 20px #ff0000'
+          }}>
+            {blastMessage}
+          </div>
+          )}
+          
+          <div className="hud-corner-top-left">
            <div style={{ color: '#000000' }}>V {(speed / 1000).toFixed(2)}</div><br/>
            <div style={{ color: '#000000' }}>KM/S</div>
          </div>
