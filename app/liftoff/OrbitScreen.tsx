@@ -149,7 +149,7 @@ export function OrbitScreen({ altitude, speed, onContinue }: OrbitScreenProps) {
       const delta = clock.getDelta();
 
       if (rocketRef.current) {
-        orbitAngleRef.current += (delta * 0.3); // Slow orbital motion
+        orbitAngleRef.current += (delta * 0.3);
         const orbitRadius = 80;
         rocketRef.current.position.x = Math.cos(orbitAngleRef.current) * orbitRadius;
         rocketRef.current.position.y = Math.sin(orbitAngleRef.current) * orbitRadius;

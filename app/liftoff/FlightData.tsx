@@ -45,7 +45,6 @@ export function FlightData({
 
   return (
     <>
-      {/* Top left - Speed & Velocity Data */}
       <div className="absolute top-20 left-20 font-mono text-white text-xs space-y-2 pointer-events-none z-40">
         <div className="border-l-2 border-white pl-2">
           <div className="text-9px">VELOCITY</div>
@@ -72,7 +71,6 @@ export function FlightData({
         </div>
       </div>
 
-      {/* Top right - Fuel Data */}
       <div className="absolute top-20 right-20 font-mono text-white text-xs space-y-2 pointer-events-none z-40 text-right">
         <div className="border-r-2 border-white pr-2">
           <div className="text-9px">FUEL</div>
@@ -80,7 +78,6 @@ export function FlightData({
           <div className="text-9px opacity-70">BURN {fuelBurnRate.toFixed(3)}/s</div>
         </div>
 
-        {/* Orbital Data when available */}
         {(apogee !== null || perigee !== null) && (
           <div className="border-r-2 border-white pr-2 mt-4">
             <div className="text-9px">ORBITAL</div>
@@ -94,7 +91,6 @@ export function FlightData({
         )}
       </div>
 
-      {/* Altitude visual bar (left side, middle) */}
       <div className="absolute left-20 top-1/2 -translate-y-1/2 font-mono text-white text-xs space-y-1 pointer-events-none z-40">
         <div className="text-9px">ALTITUDE</div>
         <div className="w-2 h-40 border border-white bg-black relative">
