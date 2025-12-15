@@ -10,6 +10,9 @@ export function setupScene() {
   return scene;
 }
 
+
+
+
 export function setupCamera(width: number, height: number, povOffset: number) {
   const camera = new THREE.PerspectiveCamera(CAMERA.FOV, width / height, CAMERA.NEAR, CAMERA.FAR);
   camera.position.set(0, GROUND_LEVEL + povOffset, CAMERA.DISTANCE_Z);
@@ -97,7 +100,7 @@ export function loadRocket(scene: THREE.Scene, groundLevel: number): Promise<THR
       rocketGroup.position.y = groundLevel;
       rocketGroup.position.x = 0;
       rocketGroup.position.z = 0;
-      
+
       const body = new THREE.Mesh(
         new THREE.CylinderGeometry(0.3, 0.4, 3, 16),
         new THREE.MeshStandardMaterial({ color: 0xcccccc, metalness: 0.6, roughness: 0.4 })
@@ -105,7 +108,7 @@ export function loadRocket(scene: THREE.Scene, groundLevel: number): Promise<THR
       body.position.y = 1.5;
       body.castShadow = true;
       rocketGroup.add(body);
-      
+
       const noseCone = new THREE.Mesh(
         new THREE.ConeGeometry(0.3, 0.8, 16),
         new THREE.MeshStandardMaterial({ color: 0xff3333, metalness: 0.8, roughness: 0.2 })
@@ -113,7 +116,7 @@ export function loadRocket(scene: THREE.Scene, groundLevel: number): Promise<THR
       noseCone.position.y = 3.2;
       noseCone.castShadow = true;
       rocketGroup.add(noseCone);
-      
+
       const fin1 = new THREE.Mesh(
         new THREE.ConeGeometry(0.15, 0.6, 8),
         new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5, roughness: 0.6 })
@@ -122,7 +125,7 @@ export function loadRocket(scene: THREE.Scene, groundLevel: number): Promise<THR
       fin1.rotation.z = Math.PI / 4;
       fin1.castShadow = true;
       rocketGroup.add(fin1);
-      
+
       const fin2 = new THREE.Mesh(
         new THREE.ConeGeometry(0.15, 0.6, 8),
         new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5, roughness: 0.6 })
@@ -131,7 +134,7 @@ export function loadRocket(scene: THREE.Scene, groundLevel: number): Promise<THR
       fin2.rotation.z = Math.PI / 4;
       fin2.castShadow = true;
       rocketGroup.add(fin2);
-      
+
       const fin3 = new THREE.Mesh(
         new THREE.ConeGeometry(0.15, 0.6, 8),
         new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.5, roughness: 0.6 })
@@ -140,7 +143,7 @@ export function loadRocket(scene: THREE.Scene, groundLevel: number): Promise<THR
       fin3.rotation.x = Math.PI / 4;
       fin3.castShadow = true;
       rocketGroup.add(fin3);
-      
+
       scene.add(rocketGroup);
       return rocketGroup;
     };
@@ -153,13 +156,13 @@ export function loadRocket(scene: THREE.Scene, groundLevel: number): Promise<THR
       rocket.position.z = 0;
       scene.add(rocket);
       resolve(rocket);
-    }, 
-    (progress) => {
-      console.log("Loading rocket:", (progress.loaded / progress.total * 100).toFixed(0) + "%");
     },
-    (error) => {
-      console.error("Failed to load rocket model, using fallback:", error);
-      resolve(createFallback());
-    });
+      (progress) => {
+        console.log("Loading rocket:", (progress.loaded / progress.total * 100).toFixed(0) + "%");
+      },
+      (error) => {
+        console.error("Failed to load rocket model, using fallback:", error);
+        resolve(createFallback());
+      });
   });
 }

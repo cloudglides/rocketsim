@@ -115,6 +115,20 @@ export default function LiftoffPage() {
     const mathQuestionRef = useRef<{ q: string; answers: number[]; correct: number } | null>(null);
     const spacePressedRef = useRef(false);
 
+  useEffect(() => {
+    if (!showTitle || showMissionSelect) {
+      return;
+    }
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        setShowMissionSelect(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [showTitle, showMissionSelect]);
+
   useEffect(() => { thrustActiveRef.current = thrustActive; }, [thrustActive]);
   useEffect(() => { thrustPowerRef.current = thrustPower; }, [thrustPower]);
   useEffect(() => { gravityRef.current = gravity; }, [gravity]);
@@ -365,8 +379,6 @@ export default function LiftoffPage() {
         const rotationDamping = 0.68;
         const maxRotation = Math.PI / 1.8;
 
-        rocket.rotation.x += tiltInputRef.current.x * 0.08;
-        rocket.rotation.z += tiltInputRef.current.z * 0.08;
         rocket.rotation.x = Math.max(-maxRotation, Math.min(maxRotation, rocket.rotation.x));
         rocket.rotation.z = Math.max(-maxRotation, Math.min(maxRotation, rocket.rotation.z));
         rocket.rotation.y = 0;
@@ -447,9 +459,11 @@ export default function LiftoffPage() {
               setMissionCompleted(true);
               setFadeOut(true);
               setTimeout(() => {
+                sceneInitialized.current = false;
                 setShowTitle(true);
                 setShowMissionSelect(true);
                 setMissionCompleted(false);
+                setCurrentMission('CHAPTER 1');
               }, 3000);
             }
           }
@@ -809,113 +823,93 @@ export default function LiftoffPage() {
     nextQuestionTimeRef.current = 0;
   };
 
-  if (showTitle && !showMissionSelect) {
-    const handleContinueClick = () => {
-      setShowMissionSelect(true);
-    };
 
-    return (
-      <div className="title-screen" style={{ pointerEvents: 'all' }}>
-        <div className="title-content">
-          <div className="title-text">LIFTOFF</div>
-          <div className="title-subtitle">ROCKET SIMULATOR</div>
-          <div style={{ fontSize: '11px', lineHeight: '1.8', marginTop: '32px', maxWidth: '400px', letterSpacing: '0.5px', opacity: 0.7 }}>
-            REACH ORBITAL ALTITUDE (1000 KM) WITH LIMITED FUEL<br/><br/>
-            SPACE = THROTTLE<br/>
-            DRAG TO ADJUST POV<br/>
-            DOUBLE CLICK TO RESET VIEW<br/><br/>
-            MANAGE YOUR ROCKET TO ACHIEVE ORBIT
-          </div>
-        </div>
-        <button 
-          type="button"
-          onClick={handleContinueClick}
-          onMouseDown={handleContinueClick}
-          style={{
-            padding: '12px 28px',
-            border: '1px solid black',
-            background: '#ffffff',
-            color: '#000000',
-            fontSize: '11px',
-            fontWeight: 400,
-            letterSpacing: '1px',
-            textTransform: 'uppercase',
-            cursor: 'pointer',
-            fontFamily: "'Courier New', monospace",
-            marginTop: '16px',
-            position: 'relative',
-            zIndex: 101,
-            pointerEvents: 'auto',
-            outline: 'none',
-            display: 'block'
-          }}
-        >
-          START
-        </button>
-      </div>
-    );
-  }
 
-  if (showTitle && showMissionSelect) {
-    const handleMissionSelect = (missionName: string) => {
-      const mission = Object.values(MISSIONS).find(m => m.name === missionName);
-      if (mission) {
-        fuelRef.current = mission.fuel;
-        setFuelPercent(mission.fuel);
-        gravityRef.current = mission.gravity;
-        setGravity(mission.gravity);
-        windForceRef.current = mission.wind;
-        setCurrentMissionConfig(mission);
-        stageSeparatedRef.current = false;
-        setStageSeparated(false);
-        engineTempRef.current = 0;
-        setEngineTemp(0);
-        malfunctionRef.current = { active: false, timeLeft: 0 };
-      }
-      setCurrentMission(missionName);
-      setShowTitle(false);
-      setShowMissionSelect(false);
-    };
-
-    return (
-      <div className="title-screen" style={{ pointerEvents: 'all' }}>
-        <div className="title-content">
-          <div className="title-text">SELECT MISSION</div>
-          <div style={{ fontSize: '11px', lineHeight: '2.2', marginTop: '32px', letterSpacing: '1px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {Object.values(MISSIONS).map(mission => (
-              <button
-                type="button"
-                key={mission.name}
-                onClick={() => handleMissionSelect(mission.name)}
-                style={{
-                  padding: '16px 32px',
-                  border: '1px solid black',
-                  background: currentMission === mission.name ? '#000000' : '#ffffff',
-                  color: currentMission === mission.name ? '#ffffff' : '#000000',
-                  fontSize: '12px',
-                  fontWeight: 400,
-                  letterSpacing: '1px',
-                  cursor: 'pointer',
-                  fontFamily: "'Courier New', monospace",
-                  transition: 'all 0.15s ease',
-                  position: 'relative',
-                  zIndex: 101,
-                  pointerEvents: 'auto'
-                }}
-              >
-                <div style={{ marginBottom: '8px' }}>{mission.name}</div>
-                <div style={{ fontSize: '10px', opacity: 0.7 }}>{mission.description}</div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const handleMissionSelect = (missionName: string) => {
+    const mission = Object.values(MISSIONS).find(m => m.name === missionName);
+    if (mission) {
+      fuelRef.current = mission.fuel;
+      setFuelPercent(mission.fuel);
+      gravityRef.current = mission.gravity;
+      setGravity(mission.gravity);
+      windForceRef.current = mission.wind;
+      setCurrentMissionConfig(mission);
+      stageSeparatedRef.current = false;
+      setStageSeparated(false);
+      engineTempRef.current = 0;
+      setEngineTemp(0);
+      malfunctionRef.current = { active: false, timeLeft: 0 };
+    }
+    setCurrentMission(missionName);
+    setShowTitle(false);
+    setShowMissionSelect(false);
+  };
 
   return (
-    <div className="relative w-full h-screen overflow-hidden">
-      <div ref={mountRef} className="absolute inset-0" style={{ zIndex: 10, display: showTitle ? 'none' : 'block' }} />
+     <div className="relative w-full h-screen overflow-hidden">
+       {showTitle && !showMissionSelect && (
+         <div className="title-screen" style={{ pointerEvents: 'all' }}>
+           <div className="title-content">
+             <div className="title-text">LIFTOFF</div>
+             <div className="title-subtitle">ROCKET MATH GAME</div>
+             <div style={{ fontSize: '11px', lineHeight: '1.8', marginTop: '32px', maxWidth: '400px', letterSpacing: '0.5px', opacity: 0.7 }}>
+               SOLVE MATH PROBLEMS TO FUEL YOUR ROCKET<br/><br/>
+               SPACE = SOLVE MATH PROBLEM<br/>
+               ANSWER CORRECTLY = +30 FUEL<br/>
+               ANSWER WRONG = -100 FUEL<br/><br/>
+               REACH 1000 KM ALTITUDE TO WIN
+             </div>
+           </div>
+           <div style={{ marginTop: '40px', fontSize: '16px', fontWeight: 'bold', letterSpacing: '2px', animation: 'pulse 1.5s infinite' }}>
+             PRESS SPACE TO START
+           </div>
+         </div>
+       )}
+
+       {showTitle && showMissionSelect && (
+         <div className="title-screen" style={{ pointerEvents: 'all' }}>
+           <div className="title-content">
+             <div className="title-text">SELECT MISSION</div>
+           </div>
+           <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '40px' }}>
+             {Object.values(MISSIONS).map(mission => (
+               <button
+                 type="button"
+                 key={mission.name}
+                 onClick={() => handleMissionSelect(mission.name)}
+                 style={{
+                    padding: '16px 24px',
+                    border: '1px solid white',
+                    background: '#ffffff',
+                    color: '#000000',
+                    fontSize: '11px',
+                    fontWeight: 400,
+                    letterSpacing: '1px',
+                    cursor: 'pointer',
+                    fontFamily: "'Courier New', monospace",
+                    position: 'relative',
+                    zIndex: 101,
+                    pointerEvents: 'auto',
+                    outline: 'none',
+                    display: 'inline-block',
+                    width: '180px',
+                    minHeight: '80px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    textAlign: 'center'
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold', marginBottom: '6px' }}>{mission.name}</div>
+                  <div style={{ fontSize: '9px', opacity: 0.7, lineHeight: '1.3' }}>{mission.description}</div>
+                </button>
+             ))}
+           </div>
+         </div>
+       )}
+       
+       <div ref={mountRef} className="absolute inset-0" style={{ zIndex: 10, display: showTitle || showMissionSelect ? 'none' : 'block' }} />
       
       {gameState === 'orbit' && orbitMode ? (
         <OrbitSuccess
@@ -939,17 +933,6 @@ export default function LiftoffPage() {
          >
            Reset
          </button>
-         <div style={{ fontSize: '9px', opacity: 0.5, marginTop: '12px', letterSpacing: '0.5px', lineHeight: '1.6' }}>
-           SPACE = SOLVE MATH<br/>
-           W/S = PITCH<br/>
-           A/D = ROLL<br/>
-           DRAG = LOOK<br/>
-           <span style={{ marginTop: '8px', display: 'block', borderTop: '1px solid rgba(255,255,255,0.3)', paddingTop: '8px' }}>
-           F = 2X SPEED<br/>
-           B = BOOST (15 fuel)<br/>
-           SHIFT+W = WARP (25 fuel)
-           </span>
-         </div>
        </div>}
 
       {!orbitMode && <div className="wind-indicator">
@@ -962,9 +945,7 @@ export default function LiftoffPage() {
         </div>
       </div>}
 
-      {!orbitMode && <div className="tilt-indicator">
-        PITCH: {tiltDisplay.x.toFixed(2)} | ROLL: {tiltDisplay.z.toFixed(2)}
-      </div>}
+
 
       {!orbitMode && <div className="config-box">
         <div className="config-title">Options</div>

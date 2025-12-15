@@ -327,7 +327,6 @@ label {
   justify-content: center;
   z-index: 100;
   font-family: 'Courier New', monospace;
-  gap: 32px;
   pointer-events: auto;
 }
 
