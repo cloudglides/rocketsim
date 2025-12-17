@@ -891,7 +891,6 @@ export default function LiftoffPage() {
                     zIndex: 101,
                     pointerEvents: 'auto',
                     outline: 'none',
-                    display: 'inline-block',
                     width: '180px',
                     minHeight: '80px',
                     display: 'flex',
